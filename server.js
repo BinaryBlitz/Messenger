@@ -5,7 +5,7 @@ var server = require('http').Server(app);
 var io = require('socket.io')(server);
 
 //Set our static file directory to public
-app.use(express.static(__dirname + '/public'));
+//app.use(express.static(__dirname + '/public'));
 
 //Connect to mongo DB database
 
@@ -17,7 +17,7 @@ var uristring =
 mongoose.connect(uristring, function(err,res) {
 	 if (err) {
         console.log ('ERROR connecting to: ' + uristring + '. ' + err);
-        trow err;
+     //   trow err;
     } else {
         console.log ('Succeeded connected to: ' + uristring);
     }
@@ -33,14 +33,14 @@ var ChatSchema = mongoose.Schema({
 
 //Create a model from the chat schema
 
-ChatSchema.pre('save', function(next) {
-    // get the current date
-    var currentDate = new Date();
+// ChatSchema.pre('save', function(next) {
+//     // get the current date
+//     var currentDate = new Date();
 
-    this.created_at = currentDate;
+//     this.created_at = currentDate;
 
-    next();
-});
+//     next();
+// });
 
 var Chat = mongoose.model('Chat', ChatSchema);
 
