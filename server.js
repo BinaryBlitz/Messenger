@@ -60,7 +60,8 @@ app.all('/*', function(req, res, next) {
 //Route for our index file
 app.get('/', function(req, res) {
   //send the index.html in our public directory
-  res.sendfile('index.html');
+ // res.sendfile('index.html');
+ res.json({"main":"true"});
 });
 
 
@@ -99,7 +100,8 @@ app.post('/setup', function(req, res) {
     });
   }
   //Send a resoponse so the serve would not get stuck
-  res.send('created');
+  res.json({message: 'Point created!'});
+ // res.send('created');
 });
 
 //This route produces a list of chat as filterd by 'room' query
