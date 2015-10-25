@@ -8,7 +8,20 @@ var io = require('socket.io')(server);
 app.use(express.static(__dirname + '/public'));
 
 //Connect to mongo DB database
-mongoose.connect("mongodb://127.0.0.1:27017/scotch-chat");
+
+var uristring =
+    process.env.MONGOLAB_URI ||
+    process.env.MONGOHQ_URL ||
+    'mongodb://localhost:27017/HelloMongoose';
+
+mongoose.connect(uristring, function(err,res) {
+	 if (err) {
+        console.log ('ERROR connecting to: ' + uristring + '. ' + err);
+        trow err;
+    } else {
+        console.log ('Succeeded connected to: ' + uristring);
+    }
+});
 
 //Create a schema for chat
 var ChatSchema = mongoose.Schema({
@@ -19,6 +32,16 @@ var ChatSchema = mongoose.Schema({
 });
 
 //Create a model from the chat schema
+
+ChatSchema.pre('save', function(next) {
+    // get the current date
+    var currentDate = new Date();
+
+    this.created_at = currentDate;
+
+    next();
+});
+
 var Chat = mongoose.model('Chat', ChatSchema);
 
 //Allow CORS
