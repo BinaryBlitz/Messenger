@@ -1,5 +1,5 @@
 {
-  "name": "scotch-chat",
+  "name": "messenger-binary",
   "main": "server.js",
   "dependencies": {
     "express": "^4.13.3",
