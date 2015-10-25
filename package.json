@@ -2,9 +2,12 @@
   "name": "messenger-binary",
   "main": "server.js",
   "dependencies": {
+    "body-parser": "^1.14.1",
     "express": "^4.13.3",
+    "method-override": "^2.3.5",
     "mongoose": "latest",
     "morgan": "latest",
+    "serve-favicon": "^2.3.0",
     "socket.io": "latest"
   }
 }

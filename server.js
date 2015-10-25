@@ -1,11 +1,24 @@
 var express = require('express');
+var favicon = require('serve-favicon');
 var mongoose = require('mongoose');
+var morgan = require('morgan');
+var bodyParser = require('body-parser');
+var methodOverride = require('method-override');
 var app = express();
 var server = require('http').Server(app);
 var io = require('socket.io')(server);
 
 //Set our static file directory to public
 //app.use(express.static(__dirname + '/public'));
+
+
+app.use(favicon(__dirname + '/favicon.ico'));
+app.use(morgan('combined'));
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(bodyParser.json());
+app.use(methodOverride());
+//app.use(express.static(path.join(__dirname, "public")));
+
 
 //Connect to mongo DB database
 
