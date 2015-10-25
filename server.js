@@ -9,7 +9,7 @@ var io = require('socket.io')(server);
 
 //Connect to mongo DB database
 
-var uristring =
+var uristring = 'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d'||
     process.env.MONGOLAB_URI ||
     process.env.MONGOHQ_URL ||
     'mongodb://localhost:27017/HelloMongoose';
