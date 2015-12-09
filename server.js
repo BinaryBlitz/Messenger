@@ -112,6 +112,8 @@ app.get('/conversations', function(req,res) {
 	});
 });
 
+
+
 app.post('/conversations', function(req, res){
 
 	var message = req.body.message;
@@ -128,6 +130,26 @@ app.post('/conversations', function(req, res){
 
 });
 
+app.post('/messages',function(req,res){
+	var message = req.body.message;
+	var to_id = req.body.to_id;
+	var from_id = req.body.from_id;
+
+	messageWork(message, from_id,to_id, function(err,conv,msg) {
+
+		if (err) {
+			res.json(err);
+		} else {
+			io.in(to_id).emit('message created', msg);
+			res.json(msg);
+		}
+
+	});
+
+
+
+});
+
 
 var messageWork = function(message,to_id,from_id,next) {
 
@@ -136,7 +158,7 @@ var messageWork = function(message,to_id,from_id,next) {
 				saveMessage(message,function(err,msg){
 					conv.messages.push(msg);
 					conv.save(function(err,convers){
-						next(err,convers);
+						next(err,convers,message);
 					});
 				});
 			} else {
@@ -147,7 +169,7 @@ var messageWork = function(message,to_id,from_id,next) {
 							saveConversation(convers, to_id);
 							saveConversation(convers, from_id);
 						}
-						next(err, convers);
+						next(err, convers, message);
 					});
 				});
 			}
@@ -208,9 +230,7 @@ io.on('connection', function(socket) {
 
   	socket.join(user_id);
 
-  }); 
-
-
+  });
 
   socket.on('new message', function(data) {
 
