@@ -143,11 +143,7 @@ app.post('/messages',function(req,res){
 			io.in(to_id).emit('message created', msg);
 			res.json(msg);
 		}
-
 	});
-
-
-
 });
 
 
@@ -158,7 +154,7 @@ var messageWork = function(message,to_id,from_id,next) {
 				saveMessage(message,function(err,msg){
 					conv.messages.push(msg);
 					conv.save(function(err,convers){
-						next(err,convers,message);
+						next(err,convers,msg);
 					});
 				});
 			} else {
@@ -169,7 +165,7 @@ var messageWork = function(message,to_id,from_id,next) {
 							saveConversation(convers, to_id);
 							saveConversation(convers, from_id);
 						}
-						next(err, convers, message);
+						next(err, convers, msg);
 					});
 				});
 			}
