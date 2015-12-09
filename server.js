@@ -112,6 +112,24 @@ app.get('/conversations', function(req,res) {
 	});
 });
 
+app.get('/conversations_between', function(req,res){
+
+	var from_id = req.query.from_id;
+	var to_id = req.query.to_id;
+
+	findConvFor(from_id,to_id, function(conversation, error){
+		if(error) {
+			res.json(error);
+		} else {
+			res.json(conversation);
+		}
+	})
+
+});
+
+
+app.post ('/create')
+
 
 
 app.post('/conversations', function(req, res){
