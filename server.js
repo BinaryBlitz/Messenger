@@ -121,14 +121,11 @@ app.get('/conversations_between', function(req,res){
 		if(error) {
 			res.json(error);
 		} else {
-			res.json({"conversation":conversation});
+			res.json(conversation);
 		}
 	})
 
 });
-
-
-//
 
 
 
