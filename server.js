@@ -38,7 +38,7 @@ mongoose.connect(uristring, function(err,res) {
 
 //Create a schema for chat
 
-var ChatSchema = mongoose.Schema({
+var MessageSchema = mongoose.Schema({
   created: Date,
   content: String,
   username: String,
@@ -48,7 +48,7 @@ var ChatSchema = mongoose.Schema({
 
 var ConversationSchema = mongoose.Schema({
 	users:[Number],
-	messages:[ChatSchema]
+	messages:[MessageSchema]
 });
 
 var UserSchema = mongoose.Schema({
@@ -59,7 +59,7 @@ var UserSchema = mongoose.Schema({
 
 
 var User =  mongoose.model('User',UserSchema);
-var Chat = mongoose.model('Chat', ChatSchema);
+var Message = mongoose.model('Message', MessageSchema);
 var Conversation = mongoose.model('Conversation',ConversationSchema);
 
 //Allow CORS
@@ -149,6 +149,7 @@ app.post('/messages',function(req,res){
 	var message = req.body.message;
 	var to_id = req.body.to_id;
 	var from_id = req.body.from_id;
+	io.
 
 	messageWork(message, from_id,to_id, function(err,conv,msg) {
 
@@ -195,7 +196,7 @@ var findConvFor = function(from_id, to_id,next){
 
 var saveMessage = function (data, next) {
 	//console.log(data);
-	var newMsg = new Chat({
+	var newMsg = new Message({
    				   username: data.username,
       				content: data.message,
      				 created: new Date(),
@@ -243,26 +244,28 @@ io.on('connection', function(socket) {
 
   });
 
-  socket.on('new message', function(data) {
+  socket.on('registration',function)
 
-  	var message = data.message;
-	var to_id = data.to_id;
-	var from_id = data.from_id;
+//   socket.on('new message', function(data) {
 
-console.log (message);
-console.log(to_id, from_id);
-	messageWork(message,to_id,from_id, function(err, conv){
-		if(conv){
-			//socket.join(to_id);
-			//socket.join(from_id);
+//   	var message = data.message;
+// 	var to_id = data.to_id;
+// 	var from_id = data.from_id;
 
-			var msg = conv.messages[conv.messages.length - 1];
-			io.in(to_id).emit('message created', msg);
-			io.in(from_id).emit('message created', msg);
-		}
-	});
+// console.log (message);
+// console.log(to_id, from_id);
+// 	messageWork(message,to_id,from_id, function(err, conv){
+// 		if(conv){
+// 			//socket.join(to_id);
+// 			//socket.join(from_id);
 
-  });
+// 			var msg = conv.messages[conv.messages.length - 1];
+// 			io.in(to_id).emit('message created', msg);
+// 			io.in(from_id).emit('message created', msg);
+// 		}
+// 	});
+
+//   });
 });
 /*||||||||||||||||||||||||||||||||||||||END SOCKETS||||||||||||||||||||||||||||||||||||||*/
 
