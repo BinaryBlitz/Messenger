@@ -2,6 +2,7 @@
   "name": "messenger-binary",
   "main": "server.js",
   "dependencies": {
+    "apn": "^1.7.5",
     "body-parser": "^1.14.1",
     "express": "^4.13.3",
     "method-override": "^2.3.5",

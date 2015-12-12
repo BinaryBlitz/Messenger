@@ -4,6 +4,8 @@ var mongoose = require('mongoose');
 var morgan = require('morgan');
 var bodyParser = require('body-parser');
 var methodOverride = require('method-override');
+var apn = require('apn');
+
 var app = express();
 app.set('port', (process.env.PORT || 5000));
 //var server = require('http').Server(app);
@@ -36,6 +38,10 @@ mongoose.connect(uristring, function(err,res) {
     }
 });
 
+var options = {production:false};
+
+var apnConnection = new apn.Connection(options);
+
 //Create a schema for chat
 
 var MessageSchema = mongoose.Schema({
@@ -54,6 +60,12 @@ var ConversationSchema = mongoose.Schema({
 var UserSchema = mongoose.Schema({
 	userID:Number,
 	username:String,
+	first_name:String,
+	last_name:String,
+	is_ios:Boolean,
+	apns_key:String,
+	android_key:String,
+	thumb_url:String
 });
 
 
@@ -78,6 +90,21 @@ app.all('/*', function(req, res, next) {
 //Route for our index file
 app.get('/', function(req, res) {
  res.json({"main":"true"});
+});
+
+
+app.post('/registration',function(req, res) {
+
+
+	saveUser(req.body, function(err,user){
+
+		if(err) {
+			res.json(err);
+		} else {
+			res.json(user);
+		}
+
+	});
 });
 
 app.get('/messages',function(req,res) {
@@ -127,8 +154,6 @@ app.get('/conversations_between', function(req,res){
 
 });
 
-
-
 app.post('/conversations', function(req, res){
 
 	var message = req.body.message;
@@ -149,7 +174,8 @@ app.post('/messages',function(req,res){
 	var message = req.body.message;
 	var to_id = req.body.to_id;
 	var from_id = req.body.from_id;
-	io.
+	
+
 
 	messageWork(message, from_id,to_id, function(err,conv,msg) {
 
@@ -161,6 +187,7 @@ app.post('/messages',function(req,res){
 		}
 	});
 });
+
 
 
 var messageWork = function(message,to_id,from_id,next) {
@@ -209,19 +236,68 @@ var saveMessage = function (data, next) {
 
 var saveConversation = function (conversation, user_id) {
 
+	// User.findOne({userID:user_id}, function(err, user){
+
+	// 	if(user) {
+	// 		console.log(user);
+	// 		user.conversations.push(conversation);
+	// 	} else {
+	// 		var u = new User({userID:user_id,
+	// 					conversations:[conversation]
+	// 		});
+	// 		u.save();
+	// 	}
+
+	// });
+}
+
+var saveUser = function(data,next) {
+	var user_id = data.user_id;
 	User.findOne({userID:user_id}, function(err, user){
+		if(!user) {
+			user = new User({userID:user_id});
+		} 
+		var is_ios = data.is_ios;
+		var first_name = data.first_name;
+		var last_name = data.last_name;
+		var thumb_url = data.thumb_url;
+
+		user.is_ios = is_ios;
+		user.first_name = first_name;
+		user.last_name = last_name;
+		user.thumb_url = thumb_url;
+
+		if (is_ios) {
+			var apns_key = data.apns_key;
+			user.apns_key = apns_key;
+		}
+		user.save(function(err) {
+			next(err,user);
+
+		});
+	 });
+}
+
+var sendPush = function (message,to_id,next) {
+
+	var user = User.findOne({userID:user_id}, function(err, user){
 
 		if(user) {
-			console.log(user);
-			user.conversations.push(conversation);
-		} else {
-			var u = new User({userID:user_id,
-						conversations:[conversation]
-			});
-			u.save();
-		}
 
-	});
+			if(user.is_ios && user.apns_key) {}
+				var myDevice = new apn.Device(user.apns_key);
+				var note = new apn.Notification();
+				note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
+				note.sound = "ping.aiff";
+				note.alert = user.first_name + user.last_name +": "+message.content;
+				note.payload = {'messageFrom': user.userID};
+				apnConnection.pushNotification(note, myDevice); 
+		} else {
+
+		}
+	}
+	);
+
 }
 
 /*||||||||||||||||||||||||||||||||||||||END ROUTES||||||||||||||||||||||||||||||||||||||*/
@@ -244,7 +320,6 @@ io.on('connection', function(socket) {
 
   });
 
-  socket.on('registration',function)
 
 //   socket.on('new message', function(data) {
 
