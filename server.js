@@ -162,6 +162,7 @@ app.post('/conversations', function(req, res){
 
 	messageWork(message, from_id,to_id, function(err, conv){
 		if(err){
+			// sendPush(message,to_id);
 			res.json(err);
 		} else {
 			res.json(conv);
@@ -182,6 +183,7 @@ app.post('/messages',function(req,res){
 		if (err) {
 			res.json(err);
 		} else {
+			sendPush(msg, to_id);
 			io.in(to_id).emit('message created', msg);
 			res.json(msg);
 		}
@@ -278,24 +280,28 @@ var saveUser = function(data,next) {
 	 });
 }
 
-var sendPush = function (message,to_id,next) {
+var sendPush = function (message,to_id) {
 
-	var user = User.findOne({userID:user_id}, function(err, user){
+	var user = User.findOne({userID:to_id}, function(err, user){
 
 		if(user) {
 
-			if(user.is_ios && user.apns_key) {}
+			if(user.is_ios && user.apns_key) {
+				console.log(user.apns_key);
 				var myDevice = new apn.Device(user.apns_key);
 				var note = new apn.Notification();
 				note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
 				note.sound = "ping.aiff";
-				note.alert = user.first_name + user.last_name +": "+message.content;
+				note.alert = user.first_name + " " + user.last_name +": "+message.content;
 				note.payload = {'messageFrom': user.userID};
 				apnConnection.pushNotification(note, myDevice); 
 		} else {
 
 		}
+
+
 	}
+}
 	);
 
 }
