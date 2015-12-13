@@ -24,10 +24,7 @@ app.use(methodOverride());
 
 //Connect to mongo DB database
 
-var uristring = 'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d'||
-    process.env.MONGOLAB_URI ||
-    process.env.MONGOHQ_URL ||
-    'mongodb://localhost:27017/HelloMongoose';
+var uristring = 'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d';
 
 mongoose.connect(uristring, function(err,res) {
 	 if (err) {
@@ -128,16 +125,18 @@ app.get('/conversations', function(req,res) {
 
 	var user_id = req.query.user_id;
 
-	Conversation.find ({users: { "$in" : [user_id]}}, function(err, conversations){
+	Conversation.find({users: { "$in" : [user_id]}}, function(err, conversations){
+
+		conversations = conversations.sort({"messages.created":1});
 
 		if(err){
 			res.json(err);
 		} else {
-
 			res.json(conversations);
 		}
 	});
 });
+
 
 app.get('/conversations_between', function(req,res){
 
@@ -282,27 +281,41 @@ var saveUser = function(data,next) {
 
 var sendPush = function (message,to_id) {
 
-	var user = User.findOne({userID:to_id}, function(err, user){
+	User.findOne({userID:message.from_id}, function(err, sender){
+		User.findOne({userID:to_id}, function(err, reciever){
+			if(sender && reciever) {
+				if(reciever.is_ios && reciever.apns_key) {
+					var myDevice = new apn.Device(reciever.apns_key);
+					var note = new apn.Notification();
+					note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
+					note.sound = "ping.aiff";
+					note.alert = sender.first_name + " " + sender.last_name +": "+message.content;
+					note.payload = {'messageFrom': sender.userID};
+					apnConnection.pushNotification(note, myDevice); 
+				}
+			}
+		});
+	});
 
-		if(user) {
+		// if(user) {
 
-			if(user.is_ios && user.apns_key) {
-				console.log(user.apns_key);
-				var myDevice = new apn.Device(user.apns_key);
-				var note = new apn.Notification();
-				note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
-				note.sound = "ping.aiff";
-				note.alert = user.first_name + " " + user.last_name +": "+message.content;
-				note.payload = {'messageFrom': user.userID};
-				apnConnection.pushNotification(note, myDevice); 
-		} else {
+		// 	if(user.is_ios && user.apns_key) {
+		// 		console.log(user.apns_key);
+		// 		var myDevice = new apn.Device(user.apns_key);
+		// 		var note = new apn.Notification();
+		// 		note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
+		// 		note.sound = "ping.aiff";
+		// 		note.alert = user.first_name + " " + user.last_name +": "+message.content;
+		// 		note.payload = {'messageFrom': user.userID};
+		// 		apnConnection.pushNotification(note, myDevice); 
+		// } else {
 
-		}
+		// }
 
 
-	}
-}
-	);
+// 	}
+// }
+// 	);
 
 }
 
