@@ -245,7 +245,7 @@ var messageWork = function(message,to_id,from_id,next) {
 }
 
 var findConvFor = function(from_id, to_id,next){
-	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}, function(err, conv){
+	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}).populate("users_refs").exec( function(err, conv){
 		next(err,conv);
 	});
 }
