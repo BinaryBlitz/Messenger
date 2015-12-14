@@ -125,9 +125,14 @@ app.get('/conversations', function(req,res) {
 
 	var user_id = req.query.user_id;
 
-	Conversation.find({users: { "$in" : [user_id]}}, function(err, conversations){
 
-		conversations = conversations.sort({"messages.created":1});
+	Conversation.find({users: { "$in" : [user_id]}},
+	 null, {sort: 'messages[messages.length - 1].created'},
+	  function(err, conversations) { 
+
+	
+
+		// conversations = conversations.sort({"messages.created":1});
 
 		if(err){
 			res.json(err);
