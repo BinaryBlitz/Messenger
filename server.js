@@ -46,12 +46,14 @@ var MessageSchema = mongoose.Schema({
   content: String,
   username: String,
   room: String,
-  from_id:Number
+  from_id:Number,
+  is_read:Boolean
 });
 
 var ConversationSchema = mongoose.Schema({
 	users:[Number],
-	messages:[MessageSchema]
+	messages:[MessageSchema],
+	last_message:MessageSchema
 });
 
 var UserSchema = mongoose.Schema({
@@ -104,20 +106,20 @@ app.post('/registration',function(req, res) {
 	});
 });
 
-app.get('/messages',function(req,res) {
+// app.get('/messages',function(req,res) {
 
-	var from_id = req.query.from_id;
-	var to_id = req.query.to_id;
+// 	var from_id = req.query.from_id;
+// 	var to_id = req.query.to_id;
 
-	findConvFor(from_id,to_id,function(err, conv) {
-		if(!err){
-		res.json(conv.messages);
-	} else {
-		res.json(err);
-	}
-	});
+// 	findConvFor(from_id,to_id,function(err, conv) {
+// 		if(!err){
+// 		res.json(conv.messages);
+// 	} else {
+// 		res.json(err);
+// 	}
+// 	});
 
-});
+// });
 
 
 
@@ -126,16 +128,35 @@ app.get('/conversations', function(req,res) {
 	var user_id = req.query.user_id;
 
 
+// 	Model.aggregate(
+//     [
+//         { "$match": { "_id": ObjectID("55d3a39565698bbc68079e31") } },
+//         { "$unwind": "$comments" },
+//         { "$sort": { "comments.date": 1 } },
+//         { "$group": {
+//             "_id": "$_id",
+//             "author": { "$first": "$author" },
+//             "link": { "$first": "$link" },
+//             "title": { "$first": "$title" },
+//             "date": { "$first": "$date" },
+//             "comments": { "$last": "$comments" }
+//         }}
+//     ]
+// )
+
+
+
 	Conversation.find({users: { "$in" : [user_id]}},
-	 null, {sort: 'messages[messages.length - 1].created'},
+	 "last_message users", {sort: '-last_message.created'},
 	  function(err, conversations) { 
 
+	  	console.log(conversations);
 	
 
 		// conversations = conversations.sort({"messages.created":1});
 
 		if(err){
-			res.json(err);
+			res.status(500).json(err);
 		} else {
 			res.json(conversations);
 		}
@@ -202,18 +223,19 @@ var messageWork = function(message,to_id,from_id,next) {
 			if(conv){
 				saveMessage(message,function(err,msg){
 					conv.messages.push(msg);
+					conv.last_message = msg;
 					conv.save(function(err,convers){
 						next(err,convers,msg);
 					});
 				});
 			} else {
 				saveMessage(message, function(err, msg){
-					conv = new Conversation ({users : [to_id,from_id], messages :[msg] });
+					conv = new Conversation ({users : [to_id,from_id], messages :[msg], last_message:msg });
 					conv.save(function(error,convers){
-						if(!error){
-							saveConversation(convers, to_id);
-							saveConversation(convers, from_id);
-						}
+						// if(!error){
+						// 	saveConversation(convers, to_id);
+						// 	saveConversation(convers, from_id);
+						// }
 						next(err, convers, msg);
 					});
 				});
