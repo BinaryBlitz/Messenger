@@ -44,21 +44,15 @@ var apnConnection = new apn.Connection(options);
 var MessageSchema = mongoose.Schema({
   created: Date,
   content: String,
-  username: String,
   room: String,
   from_id:Number,
   is_read:Boolean
 });
 
-var ConversationSchema = mongoose.Schema({
-	users:[Number],
-	messages:[MessageSchema],
-	last_message:MessageSchema
-});
 
 var UserSchema = mongoose.Schema({
+	_id: Number,
 	userID:Number,
-	username:String,
 	first_name:String,
 	last_name:String,
 	is_ios:Boolean,
@@ -67,6 +61,11 @@ var UserSchema = mongoose.Schema({
 	thumb_url:String
 });
 
+var ConversationSchema = mongoose.Schema({
+	users:[Number],
+	messages:[MessageSchema],
+	users_refs: [{ type: Number, ref: 'User' }]
+});
 
 
 var User =  mongoose.model('User',UserSchema);
@@ -106,54 +105,44 @@ app.post('/registration',function(req, res) {
 	});
 });
 
-// app.get('/messages',function(req,res) {
 
-// 	var from_id = req.query.from_id;
-// 	var to_id = req.query.to_id;
+// Recommend.aggregate(
+//     [
+//         // Grouping pipeline
+//         { "$group": { 
+//             "_id": '$roomId', 
+//             "recommendCount": { "$sum": 1 }
+//         }},
+//         // Sorting pipeline
+//         { "$sort": { "recommendCount": -1 } },
+//         // Optionally limit results
+//         { "$limit": 5 }
+//     ],
+//     function(err,result) {
 
-// 	findConvFor(from_id,to_id,function(err, conv) {
-// 		if(!err){
-// 		res.json(conv.messages);
-// 	} else {
-// 		res.json(err);
-// 	}
-// 	});
-
-// });
-
-
+//        // Result is an array of documents
+//     }
+// );
 
 app.get('/conversations', function(req,res) {
 
 	var user_id = req.query.user_id;
 
+	Conversation
+	.find({users: { "$in" : [user_id]}})
+	.select({"messages": { "$slice": -1 }})
+	.populate("users_refs")
+	.sort("-messages.created")
+	.exec(function(err, conversations) { 
 
-// 	Model.aggregate(
-//     [
-//         { "$match": { "_id": ObjectID("55d3a39565698bbc68079e31") } },
-//         { "$unwind": "$comments" },
-//         { "$sort": { "comments.date": 1 } },
-//         { "$group": {
-//             "_id": "$_id",
-//             "author": { "$first": "$author" },
-//             "link": { "$first": "$link" },
-//             "title": { "$first": "$title" },
-//             "date": { "$first": "$date" },
-//             "comments": { "$last": "$comments" }
-//         }}
-//     ]
-// )
+		conversations.forEach(function(item){
 
+			item.users_refs.forEach(function(item){
+				console.log(item.first_name);
+			});
 
-
-	Conversation.find({users: { "$in" : [user_id]}},
-	 "last_message users", {sort: '-last_message.created'},
-	  function(err, conversations) { 
-
+		});
 	  	console.log(conversations);
-	
-
-		// conversations = conversations.sort({"messages.created":1});
 
 		if(err){
 			res.status(500).json(err);
@@ -200,8 +189,6 @@ app.post('/messages',function(req,res){
 	var message = req.body.message;
 	var to_id = req.body.to_id;
 	var from_id = req.body.from_id;
-	
-
 
 	messageWork(message, from_id,to_id, function(err,conv,msg) {
 
@@ -215,22 +202,36 @@ app.post('/messages',function(req,res){
 	});
 });
 
+app.post('/read_messages', function(req, res){
+	var to_id = req.body.to_id;
+	var from_id = req.body.from_id;
+
+
+	read_all_messages(from_id,to_id,function(err,conversations) {
+
+		res.json(conversations);
+
+	});
+	
+});
+
 
 
 var messageWork = function(message,to_id,from_id,next) {
 
 		findConvFor(from_id, to_id, function(err, conv){
 			if(conv){
+				conv.users_refs = [to_id,from_id];
 				saveMessage(message,function(err,msg){
+
 					conv.messages.push(msg);
-					conv.last_message = msg;
 					conv.save(function(err,convers){
 						next(err,convers,msg);
 					});
 				});
 			} else {
 				saveMessage(message, function(err, msg){
-					conv = new Conversation ({users : [to_id,from_id], messages :[msg], last_message:msg });
+					conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg]});
 					conv.save(function(error,convers){
 						// if(!error){
 						// 	saveConversation(convers, to_id);
@@ -252,38 +253,38 @@ var findConvFor = function(from_id, to_id,next){
 var saveMessage = function (data, next) {
 	//console.log(data);
 	var newMsg = new Message({
-   				   username: data.username,
       				content: data.message,
      				 created: new Date(),
-     				 from_id: data.from_id  
+     				 from_id: data.from_id,
+     				 is_read:false
      	      });
 	newMsg.save(function(err,msg){
 		next(err,msg);
 	});
 }
 
-var saveConversation = function (conversation, user_id) {
+// var saveConversation = function (conversation, user_id) {
 
-	// User.findOne({userID:user_id}, function(err, user){
+// 	// User.findOne({userID:user_id}, function(err, user){
 
-	// 	if(user) {
-	// 		console.log(user);
-	// 		user.conversations.push(conversation);
-	// 	} else {
-	// 		var u = new User({userID:user_id,
-	// 					conversations:[conversation]
-	// 		});
-	// 		u.save();
-	// 	}
+// 	// 	if(user) {
+// 	// 		console.log(user);
+// 	// 		user.conversations.push(conversation);
+// 	// 	} else {
+// 	// 		var u = new User({userID:user_id,
+// 	// 					conversations:[conversation]
+// 	// 		});
+// 	// 		u.save();
+// 	// 	}
 
-	// });
-}
+// 	// });
+// }
 
 var saveUser = function(data,next) {
 	var user_id = data.user_id;
 	User.findOne({userID:user_id}, function(err, user){
 		if(!user) {
-			user = new User({userID:user_id});
+			user = new User({userID:user_id,_id:user_id});
 		} 
 		var is_ios = data.is_ios;
 		var first_name = data.first_name;
@@ -323,27 +324,19 @@ var sendPush = function (message,to_id) {
 			}
 		});
 	});
+}
 
-		// if(user) {
+var read_all_messages = function(from_id, to_id, next) {
 
-		// 	if(user.is_ios && user.apns_key) {
-		// 		console.log(user.apns_key);
-		// 		var myDevice = new apn.Device(user.apns_key);
-		// 		var note = new apn.Notification();
-		// 		note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
-		// 		note.sound = "ping.aiff";
-		// 		note.alert = user.first_name + " " + user.last_name +": "+message.content;
-		// 		note.payload = {'messageFrom': user.userID};
-		// 		apnConnection.pushNotification(note, myDevice); 
-		// } else {
+	// findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}
 
-		// }
-
-
-// 	}
-// }
-// 	);
-
+	Conversation.
+	findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}).
+	select({$and:[{"messages.is_read":false},{"messages.from_id":to_id}]}).
+	exec(function(err, conversations){
+		console.log(conversations)
+		next(err,conversations);
+	});
 }
 
 /*||||||||||||||||||||||||||||||||||||||END ROUTES||||||||||||||||||||||||||||||||||||||*/
