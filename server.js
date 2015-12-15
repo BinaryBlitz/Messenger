@@ -130,7 +130,7 @@ app.get('/conversations', function(req,res) {
 
 	Conversation
 	.find({users: { "$in" : [user_id]}})
-	.select({"messages": { "$slice": -1 }})
+	.select({"messages": { "$slice": -10 }})
 	.populate("users_refs")
 	.sort("-messages.created")
 	.exec(function(err, conversations) { 
@@ -245,7 +245,8 @@ var messageWork = function(message,to_id,from_id,next) {
 }
 
 var findConvFor = function(from_id, to_id,next){
-	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}).populate("users_refs").exec( function(err, conv){
+	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]})
+	.populate("users_refs").exec(function(err, conv){
 		next(err,conv);
 	});
 }
@@ -326,16 +327,22 @@ var sendPush = function (message,to_id) {
 	});
 }
 
-var read_all_messages = function(from_id, to_id, next) {
+var read_all_messages = function(from_id, to_id, next) {//REDO
 
-	// findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}
+	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}, function(err,conversation){
+		console.log("conv" + conversation);
+		conversation.messages.forEach(function(item){
+			// console.log(item);
 
-	Conversation.
-	findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}).
-	select({$and:[{"messages.is_read":false},{"messages.from_id":to_id}]}).
-	exec(function(err, conversations){
-		console.log(conversations)
-		next(err,conversations);
+			if(!item.is_read && item.from_id == to_id) {
+				item.is_read = true;
+				console.log("readed item"+item);				
+			}
+		});
+
+		conversation.save(function(err) {
+				next(err,conversation);
+		});
 	});
 }
 
