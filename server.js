@@ -5,6 +5,8 @@ var morgan = require('morgan');
 var bodyParser = require('body-parser');
 var methodOverride = require('method-override');
 var apn = require('apn');
+var crypto = require('crypto');
+var base64url = require('base64url');
 
 var app = express();
 app.set('port', (process.env.PORT || 5000));
@@ -23,6 +25,7 @@ app.use(bodyParser.json());
 app.use(methodOverride());
 
 //Connect to mongo DB database
+var messager_api_key = 'this_is_my_awesome_api_key'; 
 
 var uristring = 'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d';
 
@@ -58,7 +61,8 @@ var UserSchema = mongoose.Schema({
 	is_ios:Boolean,
 	apns_key:String,
 	android_key:String,
-	thumb_url:String
+	thumb_url:String,
+	apiKey:String
 });
 
 var ConversationSchema = mongoose.Schema({
@@ -68,7 +72,7 @@ var ConversationSchema = mongoose.Schema({
 });
 
 
-var User =  mongoose.model('User',UserSchema);
+var User = mongoose.model('User',UserSchema);
 var Message = mongoose.model('Message', MessageSchema);
 var Conversation = mongoose.model('Conversation',ConversationSchema);
 
@@ -93,40 +97,34 @@ app.get('/', function(req, res) {
 
 app.post('/registration',function(req, res) {
 
+	var messgeaApiKey = req.body.user_api_key;
 
-	saveUser(req.body, function(err,user){
+	if(messgeaApiKey !== messager_api_key) {
+		res.status(422).json({"error":"apiKey_error"})
+	} else {
+		var usr = req.body.user;
+		saveUser(usr, function(err,user){
 
-		if(err) {
-			res.json(err);
-		} else {
-			res.json(user);
-		}
+			console.log(user);
 
-	});
+			if(err) {
+				res.json(err);
+			} else {
+				res.json(user);
+			}
+
+		});
+	}
 });
 
 
-// Recommend.aggregate(
-//     [
-//         // Grouping pipeline
-//         { "$group": { 
-//             "_id": '$roomId', 
-//             "recommendCount": { "$sum": 1 }
-//         }},
-//         // Sorting pipeline
-//         { "$sort": { "recommendCount": -1 } },
-//         // Optionally limit results
-//         { "$limit": 5 }
-//     ],
-//     function(err,result) {
-
-//        // Result is an array of documents
-//     }
-// );
 
 app.get('/conversations', function(req,res) {
 
-	var user_id = req.query.user_id;
+	findUserWithToken(req.query.token, function(err,user) {
+
+		if(user) {
+			var user_id =user.userID;
 
 	Conversation
 	.find({users: { "$in" : [user_id]}})
@@ -134,88 +132,116 @@ app.get('/conversations', function(req,res) {
 	.populate("users_refs")
 	.sort("-messages.created")
 	.exec(function(err, conversations) { 
-
 		conversations.forEach(function(item){
-
 			item.users_refs.forEach(function(item){
 				console.log(item.first_name);
 			});
-
 		});
-	  	console.log(conversations);
-
 		if(err){
 			res.status(500).json(err);
 		} else {
 			res.json(conversations);
 		}
 	});
+	 } else {
+			res.status(500).json(err);
+	}
+});
+
 });
 
 
 app.get('/conversations_between', function(req,res){
 
-	var from_id = req.query.from_id;
+	findUserWithToken(req.query.token, function(err,user) {
+
+if(user) {
+	var from_id = user.userID;
 	var to_id = req.query.to_id;
 
 	findConvFor(from_id,to_id, function(conversation, error){
 		if(error) {
-			res.json(error);
+			res.status(500).json(error);
 		} else {
 			res.json(conversation);
 		}
-	})
-
-});
-
-app.post('/conversations', function(req, res){
-
-	var message = req.body.message;
-	var to_id = req.body.to_id;
-	var from_id = req.body.from_id;
-
-	messageWork(message, from_id,to_id, function(err, conv){
-		if(err){
-			// sendPush(message,to_id);
-			res.json(err);
-		} else {
-			res.json(conv);
-		}
 	});
+} else {
+	res.status(500).json(error);
+}
 
 });
+
+});
+
+// app.post('/conversations', function(req, res){
+
+// 	var message = req.body.message;
+// 	var to_id = req.body.to_id;
+// 	var from_id = req.body.from_id;
+
+// 	messageWork(message, from_id,to_id, function(err, conv){
+// 		if(err){
+// 			// sendPush(message,to_id);
+// 			res.json(err);
+// 		} else {
+// 			res.json(conv);
+// 		}
+// });
+// });
 
 app.post('/messages',function(req,res){
+
+	findUserWithToken(req.query.token, function(err,user) {
+
+		if(user) {
+
 	var message = req.body.message;
 	var to_id = req.body.to_id;
-	var from_id = req.body.from_id;
+	var from_id = user.userID;
 
 	messageWork(message, from_id,to_id, function(err,conv,msg) {
-
 		if (err) {
-			res.json(err);
+			res.status(500).json(err);
 		} else {
 			sendPush(msg, to_id);
 			io.in(to_id).emit('message created', msg);
 			res.json(msg);
 		}
-	});
+	}); 
+	} else {
+		res.status(500).json(err);
+	}
+});
 });
 
 app.post('/read_messages', function(req, res){
+findUserWithToken(req.query.token, function(err,user) {
+	if(user) {
 	var to_id = req.body.to_id;
-	var from_id = req.body.from_id;
+	var from_id = user.userID;
 
+	console.log(user);
 
 	read_all_messages(from_id,to_id,function(err,conversations) {
 
+		if(!err) {
 		res.json(conversations);
+	} else {
+		res.status(500).json(err);
+	}
 
+	}); 
+} else {
+	res.status(500).json(err);
+}
 	});
-	
+
 });
 
+/*||||||||||||||||||||||||||||||||||||||END ROUTES||||||||||||||||||||||||||||||||||||||*/
 
+/*||||||||||||||||||||||||||||||||||||||FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
 
 var messageWork = function(message,to_id,from_id,next) {
 
@@ -264,22 +290,9 @@ var saveMessage = function (data, next) {
 	});
 }
 
-// var saveConversation = function (conversation, user_id) {
-
-// 	// User.findOne({userID:user_id}, function(err, user){
-
-// 	// 	if(user) {
-// 	// 		console.log(user);
-// 	// 		user.conversations.push(conversation);
-// 	// 	} else {
-// 	// 		var u = new User({userID:user_id,
-// 	// 					conversations:[conversation]
-// 	// 		});
-// 	// 		u.save();
-// 	// 	}
-
-// 	// });
-// }
+function randomStringAsBase64Url(size) {
+  return base64url(crypto.randomBytes(size));
+}
 
 var saveUser = function(data,next) {
 	var user_id = data.user_id;
@@ -291,11 +304,12 @@ var saveUser = function(data,next) {
 		var first_name = data.first_name;
 		var last_name = data.last_name;
 		var thumb_url = data.thumb_url;
-
+		var user_api_key = randomStringAsBase64Url(16);
 		user.is_ios = is_ios;
 		user.first_name = first_name;
 		user.last_name = last_name;
 		user.thumb_url = thumb_url;
+		user.apiKey = user_api_key;
 
 		if (is_ios) {
 			var apns_key = data.apns_key;
@@ -306,6 +320,12 @@ var saveUser = function(data,next) {
 
 		});
 	 });
+}
+
+var findUserWithToken = function(token, next) {
+	User.findOne({apiKey:token}, function(err, user) {
+		next(err, user);
+	});
 }
 
 var sendPush = function (message,to_id) {
@@ -329,14 +349,16 @@ var sendPush = function (message,to_id) {
 
 var read_all_messages = function(from_id, to_id, next) {//REDO
 
+	console.log(from_id + "  " + to_id); 
+
 	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}, function(err,conversation){
-		console.log("conv" + conversation);
+
+		console.log (conversation);
+
 		conversation.messages.forEach(function(item){
-			// console.log(item);
 
 			if(!item.is_read && item.from_id == to_id) {
-				item.is_read = true;
-				console.log("readed item"+item);				
+				item.is_read = true;					
 			}
 		});
 
@@ -346,7 +368,7 @@ var read_all_messages = function(from_id, to_id, next) {//REDO
 	});
 }
 
-/*||||||||||||||||||||||||||||||||||||||END ROUTES||||||||||||||||||||||||||||||||||||||*/
+/*||||||||||||||||||||||||||||||||||||||END FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
 
 /*||||||||||||||||||||||||||||||||||||||SOCKET||||||||||||||||||||||||||||||||||||||*/
 //Listen for connection
