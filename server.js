@@ -59,10 +59,9 @@ var UserSchema = mongoose.Schema({
 	first_name:String,
 	last_name:String,
 	is_ios:Boolean,
-	apns_key:String,
-	android_key:String,
+	push_key:String,
 	thumb_url:String,
-	apiKey:String
+	token:String
 });
 
 var ConversationSchema = mongoose.Schema({
@@ -97,7 +96,7 @@ app.get('/', function(req, res) {
 
 app.post('/registration',function(req, res) {
 
-	var messgeaApiKey = req.body.user_api_key;
+	var messgeaApiKey = req.body.token;
 
 	if(messgeaApiKey !== messager_api_key) {
 		res.status(422).json({"error":"apiKey_error"})
@@ -296,11 +295,11 @@ var saveUser = function(data,next) {
 		user.first_name = first_name;
 		user.last_name = last_name;
 		user.thumb_url = thumb_url;
-		user.apiKey = user_api_key;
+		user.token = user_api_key;
 
 		if (is_ios) {
-			var apns_key = data.apns_key;
-			user.apns_key = apns_key;
+			var push_key = data.push_key;
+			user.push_key = push_key;
 		}
 		user.save(function(err) {
 			next(err,user);
@@ -310,7 +309,7 @@ var saveUser = function(data,next) {
 }
 
 var findUserWithToken = function(token, next) {
-	User.findOne({apiKey:token}, function(err, user) {
+	User.findOne({token:token}, function(err, user) {
 		next(err, user);
 	});
 }
@@ -320,8 +319,8 @@ var sendPush = function (message,to_id) {
 	User.findOne({userID:message.from_id}, function(err, sender){
 		User.findOne({userID:to_id}, function(err, reciever){
 			if(sender && reciever) {
-				if(reciever.is_ios && reciever.apns_key) {
-					var myDevice = new apn.Device(reciever.apns_key);
+				if(reciever.is_ios && reciever.push_key) {
+					var myDevice = new apn.Device(reciever.push_key);
 					var note = new apn.Notification();
 					note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
 					note.sound = "ping.aiff";
