@@ -133,8 +133,8 @@ app.get('/conversations', function(req,res) {
 	.sort("-messages.created")
 	.exec(function(err, conversations) { 
 		conversations.forEach(function(item){
-			item.users_refs.forEach(function(item){
-				console.log(item.first_name);
+			item.users.forEach(function(it){
+				console.log("conversation types " + typeof(it));
 			});
 		});
 		if(err){
@@ -146,20 +146,25 @@ app.get('/conversations', function(req,res) {
 	 } else {
 			res.status(500).json(err);
 	}
-});
-
+}); 
 });
 
 
 app.get('/conversations_between', function(req,res){
 
+	console.log("token " + req.query.token);
+
 	findUserWithToken(req.query.token, function(err,user) {
+	console.log("token " + req.query.token + user);
+	if(user) {
+		var from_id = user.userID;
+		var to_id =req.query.to_id;
 
-if(user) {
-	var from_id = user.userID;
-	var to_id = req.query.to_id;
+	console.log(from_id + "  " + to_id + " type from_id" + typeof(from_id) + "type to_id" + typeof(to_id));
 
-	findConvFor(from_id,to_id, function(conversation, error){
+	findConvFor(from_id, to_id, function(error, conversation){
+
+		console.log("conversation beetween" + conversation);
 		if(error) {
 			res.status(500).json(error);
 		} else {
@@ -167,38 +172,20 @@ if(user) {
 		}
 	});
 } else {
-	res.status(500).json(error);
+	console.log(err);
+	res.status(500).json(err);
 }
-
+});
 });
 
-});
-
-// app.post('/conversations', function(req, res){
-
-// 	var message = req.body.message;
-// 	var to_id = req.body.to_id;
-// 	var from_id = req.body.from_id;
-
-// 	messageWork(message, from_id,to_id, function(err, conv){
-// 		if(err){
-// 			// sendPush(message,to_id);
-// 			res.json(err);
-// 		} else {
-// 			res.json(conv);
-// 		}
-// });
-// });
 
 app.post('/messages',function(req,res){
+	findUserWithToken(req.body.token, function(err,user) {
 
-	findUserWithToken(req.query.token, function(err,user) {
-
-		if(user) {
-
+	if(user) {
 	var message = req.body.message;
 	var to_id = req.body.to_id;
-	var from_id = user.userID;
+	var from_id = parseInt(user.userID);
 
 	messageWork(message, from_id,to_id, function(err,conv,msg) {
 		if (err) {
@@ -216,9 +203,9 @@ app.post('/messages',function(req,res){
 });
 
 app.post('/read_messages', function(req, res){
-findUserWithToken(req.query.token, function(err,user) {
+findUserWithToken(req.body.token, function(err,user) {
 	if(user) {
-	var to_id = req.body.to_id;
+	var to_id = parseInt(req.body.to_id);
 	var from_id = user.userID;
 
 	console.log(user);
@@ -295,7 +282,7 @@ function randomStringAsBase64Url(size) {
 }
 
 var saveUser = function(data,next) {
-	var user_id = data.user_id;
+	var user_id = parseInt(data.user_id);
 	User.findOne({userID:user_id}, function(err, user){
 		if(!user) {
 			user = new User({userID:user_id,_id:user_id});
