@@ -96,7 +96,7 @@ app.get('/', function(req, res) {
 
 app.post('/registration',function(req, res) {
 
-	var messgeaApiKey = req.body.token;
+	var messgeaApiKey = req.body.user_api_key;
 
 	if(messgeaApiKey !== messager_api_key) {
 		res.status(422).json({"error":"apiKey_error"})
@@ -131,11 +131,11 @@ app.get('/conversations', function(req,res) {
 	.populate("users_refs")
 	.sort("-messages.created")
 	.exec(function(err, conversations) { 
-		conversations.forEach(function(item){
-			item.users.forEach(function(it){
-				console.log("conversation types " + typeof(it));
-			});
-		});
+		// conversations.forEach(function(item){
+		// 	item.users.forEach(function(it){
+		// 		console.log("conversation types " + typeof(it));
+		// 	});
+		// });
 		if(err){
 			res.status(500).json(err);
 		} else {
@@ -149,7 +149,7 @@ app.get('/conversations', function(req,res) {
 });
 
 
-app.get('/conversations_between', function(req,res){
+app.get('/conversation_between', function(req,res){
 
 	console.log("token " + req.query.token);
 
@@ -182,23 +182,25 @@ app.post('/messages',function(req,res){
 	findUserWithToken(req.body.token, function(err,user) {
 
 	if(user) {
-	var message = req.body.message;
+
+		var messe_text = req.body.message
+
+	
 	var to_id = req.body.to_id;
 	var from_id = parseInt(user.userID);
-
+    var message = {from_id:from_id,message:messe_text};
 	messageWork(message, from_id,to_id, function(err,conv,msg) {
 		if (err) {
 			res.status(500).json(err);
 		} else {
 			sendPush(msg, to_id);
-			io.in(to_id).emit('message created', msg);
+			io.in(to_id).emit('message_created', msg);
 			res.json(msg);
 		}
 	}); 
 	} else {
 		res.status(500).json(err);
-	}
-});
+	}});
 });
 
 app.post('/read_messages', function(req, res){
@@ -364,37 +366,17 @@ io.on('connection', function(socket) {
     status:"connected"
   });
 
-  socket.on('new user', function (data){
+  socket.on('new_user', function (data){
+  	var token  = data.token;
 
-  	var user_id = data.user_id;
-
-  	console.log(user_id);
-
-  	socket.join(user_id);
-
+  	findUserWithToken (token, function(err, user){
+  		if(user) {
+  			console.log(user.userID);
+  			socket.join(user.userID);
+  	}
+  	});
   });
 
-
-//   socket.on('new message', function(data) {
-
-//   	var message = data.message;
-// 	var to_id = data.to_id;
-// 	var from_id = data.from_id;
-
-// console.log (message);
-// console.log(to_id, from_id);
-// 	messageWork(message,to_id,from_id, function(err, conv){
-// 		if(conv){
-// 			//socket.join(to_id);
-// 			//socket.join(from_id);
-
-// 			var msg = conv.messages[conv.messages.length - 1];
-// 			io.in(to_id).emit('message created', msg);
-// 			io.in(from_id).emit('message created', msg);
-// 		}
-// 	});
-
-//   });
 });
 /*||||||||||||||||||||||||||||||||||||||END SOCKETS||||||||||||||||||||||||||||||||||||||*/
 
