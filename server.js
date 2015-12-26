@@ -1,200 +1,178 @@
 //server
-var express = require('express');
-var favicon = require('serve-favicon');
-var mongoose = require('mongoose');
-var morgan = require('morgan');
-var bodyParser = require('body-parser');
-var methodOverride = require('method-override');
+var express = require('express')
+var favicon = require('serve-favicon')
+var mongoose = require('mongoose')
+var morgan = require('morgan')
+var bodyParser = require('body-parser')
+var methodOverride = require('method-override')
 
 //tokens
-var crypto = require('crypto');
-var base64url = require('base64url');
+var crypto = require('crypto')
+var base64url = require('base64url')
 
 //push
-var apn = require('apn');
-var gcm = require('node-gcm');
+var apn = require('apn')
+var gcm = require('node-gcm')
 
-var options = {production:false};
-var apnConnection = new apn.Connection(options);
+var options = {production:false}
+var apnConnection = new apn.Connection(options)
 
 //db
-var User = require("./models/models").User;
-var Message = require("./models/models").Message;
-var Conversation = require("./models/models").Conversations;
+var User = require('./models/models').User
+var Message = require('./models/models').Message
+var Conversation = require('./models/models').Conversations
 
-var app = express();
-app.set('port', (process.env.PORT || 5000));
+var app = express()
+app.set('port', (process.env.PORT || 5000))
 
 var server = app.listen(app.get('port'), function () {
-    console.log('Express server listening on port ' + app.get('port'));
-});
+    console.log('Express server listening on port ' + app.get('port'))
+})
 
-var io = require('socket.io')(server);
+var io = require('socket.io')(server)
 
-app.use(favicon(__dirname + '/favicon.ico'));
-app.use(morgan('combined'));
-app.use(bodyParser.urlencoded({extended: true}));
-app.use(bodyParser.json());
-app.use(methodOverride());
+app.use(favicon(__dirname + '/favicon.ico'))
+app.use(morgan('combined'))
+app.use(bodyParser.urlencoded({extended: true}))
+app.use(bodyParser.json())
+app.use(methodOverride())
 
 //Connect to mongo DB database
-var messager_api_key = 'this_is_my_awesome_api_key'; 
+var messager_api_key = 'this_is_my_awesome_api_key'
 
-var uristring = 'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d';
+var uristring = 'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d'
 
 mongoose.connect(uristring, function(err,res) {
    if (err) {
-        console.log ('ERROR connecting to: ' + uristring + '. ' + err);
-     //   trow err;
+        console.log ('ERROR connecting to: ' + uristring + '. ' + err)
     } else {
-        console.log ('Succeeded connected to: ' + uristring);
+        console.log ('Succeeded connected to: ' + uristring)
     }
-});
+})
 
-var options = {production:false};
+var options = {production:false}
 
-var apnConnection = new apn.Connection(options);
+var apnConnection = new apn.Connection(options)
 
 
 //Allow CORS
 app.all('/*', function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-type,Accept,X-Access-Token,X-Key');
+  res.header('Access-Control-Allow-Origin', '*')
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+  res.header('Access-Control-Allow-Headers', 'Content-type,Accept,X-Access-Token,X-Key')
   if (req.method == 'OPTIONS') {
-    res.status(200).end();
+    res.status(200).end()
   } else {
-    next();
+    next()
   }
-});
+})
 
 /*||||||||||||||||||||||||||||||||||||||ROUTES||||||||||||||||||||||||||||||||||||||*/
 //Route for our index file
 
 app.post('/registration',function(req, res) {
 
-  var messgeaApiKey = req.body.user_api_key;
+  var messgeaApiKey = req.body.user_api_key
 
   if(messgeaApiKey !== messager_api_key) {
-    res.status(422).json({"error":"apiKey_error"})
+    res.status(422).json({'error':'apiKey_error'})
   } else {
-    var usr = req.body.user;
+    var usr = req.body.user
     saveUser(usr, function(err,user){ 
-      console.log(user);
+      console.log(user)
       if(err) {
-        res.json(err);
+        res.json(err)
       } else {
-        res.json(user);
+        res.json(user)
       }
-
-    });
+    })
   }
-});
-
+})
 
 app.get('/conversations', function(req,res) {
-
   findUserWithToken(req.query.token, function(err,user) {
-
     if(user) {
-      var user_id =user.userID;
-
-  Conversation
-  .find({users: { "$in" : [user_id]}})
-  .select({"messages": { "$slice": -10 }})
-  .populate("users_refs")
-  .sort("-messages.created")
-  .exec(function(err, conversations) { 
-    if(err){
-      res.status(500).json(err);
-    } else {
-      res.json(conversations);
-    }
-  });
+      var user_id = user.userID
+      Conversation
+      .find({users: { '$in' : [user_id]}})
+      .select({'messages': { '$slice': -10 }})
+      .populate('users_refs')
+      .sort('-messages.created')
+      .exec(function(err, conversations) { 
+      if(err){
+        res.status(500).json(err)
+      } else {
+        res.json(conversations)
+      }
+  })
    } else {
-      res.status(500).json(err);
+      res.status(500).json(err)
   }
-}); 
-});
+  }) 
+})
 
 
 app.get('/conversation_between', function(req,res){
-
-  console.log("token " + req.query.token);
-
   findUserWithToken(req.query.token, function(err,user) {
-  console.log("token " + req.query.token + user);
   if(user) {
-    var from_id = user.userID;
-    var to_id =req.query.to_id;
-
-  console.log(from_id + "  " + to_id + " type from_id" + typeof(from_id) + "type to_id" + typeof(to_id));
-
-  findConvFor(from_id, to_id, function(error, conversation){
-
-    console.log("conversation beetween" + conversation);
+    var from_id = user.userID
+    var to_id =req.query.to_id
+    findConvFor(from_id, to_id, function(error, conversation){
     if(error) {
-      res.status(500).json(error);
+      res.status(500).json(error)
     } else {
-      res.json(conversation);
+      res.json(conversation)
     }
-  });
+  })
 } else {
-  console.log(err);
-  res.status(500).json(err);
+  console.log(err)
+  res.status(500).json(err)
 }
-});
-});
+})
+})
 
 
 app.post('/messages',function(req,res){
   findUserWithToken(req.body.token, function(err,user) {
 
   if(user) {
+    var msg_text = req.body.message
 
-    var messe_text = req.body.message
-
-  
-  var to_id = req.body.to_id;
-  var from_id = parseInt(user.userID);
-    var message = {from_id:from_id,message:messe_text};
+    var to_id = req.body.to_id
+    var from_id = parseInt(user.userID)
+    var message = {from_id:from_id,message:msg_text}
   messageWork(message, from_id,to_id, function(err,conv,msg) {
     if (err) {
-      res.status(500).json(err);
+      res.status(500).json(err)
     } else {
-      sendPush(msg, to_id);
-      io.in(to_id).emit('message_created', msg);
-      res.json(msg);
+      sendPush(msg, to_id)
+      io.in(to_id).emit('message_created', msg)
+      res.json(msg)
     }
-  }); 
+  })
   } else {
-    res.status(500).json(err);
-  }});
-});
+    res.status(500).json(err)
+  }})
+})
 
 app.post('/read_messages', function(req, res){
 findUserWithToken(req.body.token, function(err,user) {
   if(user) {
-  var to_id = parseInt(req.body.to_id);
-  var from_id = user.userID;
-
-  console.log(user);
-
-  read_all_messages(from_id,to_id,function(err,conversations) {
-
+    var to_id = parseInt(req.body.to_id)
+    var from_id = user.userID
+    console.log(user)
+    readAllMessages(from_id,to_id,function(err,conversations) {
     if(!err) {
-    res.json(conversations);
+      res.json(conversations)
+    } else {
+      res.status(500).json(err)
+    }
+  }) 
   } else {
-    res.status(500).json(err);
+    res.status(500).json(err)
   }
-
-  }); 
-} else {
-  res.status(500).json(err);
-}
-  });
-
-});
+})
+})
 
 /*||||||||||||||||||||||||||||||||||||||END ROUTES||||||||||||||||||||||||||||||||||||||*/
 
@@ -204,148 +182,148 @@ var messageWork = function(message,to_id,from_id,next) {
 
     findConvFor(from_id, to_id, function(err, conv){
       if(conv){
-        conv.users_refs = [to_id,from_id];
+        conv.users_refs = [to_id,from_id]
         saveMessage(message,function(err,msg){
 
-          conv.messages.push(msg);
+          conv.messages.push(msg)
           conv.save(function(err,convers){
-            next(err,convers,msg);
-          });
-        });
+            next(err,convers,msg)
+          })
+        })
       } else {
         saveMessage(message, function(err, msg){
-          conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg]});
+          conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg]})
           conv.save(function(error,convers){
-            next(err, convers, msg);
-          });
-        });
+            next(err, convers, msg)
+          })
+        })
       }
-    });
+    })
 }
 
 var findConvFor = function(from_id, to_id,next){
-  Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]})
-  .populate("users_refs").exec(function(err, conv){
-    next(err,conv);
-  });
+  Conversation
+  .findOne({$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]})
+  .populate('users_refs').exec(function(err, conv){
+    next(err,conv)
+  })
 }
 
 var saveMessage = function (data, next) {
-  //console.log(data);
   var newMsg = new Message({
-              content: data.message,
-             created: new Date(),
-             from_id: data.from_id,
-             is_read:false
-            });
+                content: data.message
+              , created: new Date()
+              , from_id: data.from_id
+              , is_read:false
+            })
   newMsg.save(function(err,msg){
-    next(err,msg);
-  });
+    next(err,msg)
+  })
 }
 
 function randomStringAsBase64Url(size) {
-  return base64url(crypto.randomBytes(size));
+  return base64url(crypto.randomBytes(size))
 }
 
 var saveUser = function(data,next) {
-  var user_id = parseInt(data.user_id);
+  var user_id = parseInt(data.user_id)
   User.findOne({userID:user_id}, function(err, user){
     if(!user) {
-      user = new User({userID:user_id,_id:user_id});
+      user = new User({userID:user_id,_id:user_id})
     } 
-    var is_ios = data.is_ios;
-    var first_name = data.first_name;
-    var last_name = data.last_name;
-    var thumb_url = data.thumb_url;
-    var user_api_key = randomStringAsBase64Url(16);
-    user.is_ios = is_ios;
-    user.first_name = first_name;
-    user.last_name = last_name;
-    user.thumb_url = thumb_url;
-    user.token = user_api_key;
+    var is_ios = data.is_ios
+    var first_name = data.first_name
+    var last_name = data.last_name
+    var thumb_url = data.thumb_url
+    var user_api_key = randomStringAsBase64Url(16)
+    user.is_ios = is_ios
+    user.first_name = first_name
+    user.last_name = last_name
+    user.thumb_url = thumb_url
+    user.token = user_api_key
 
     if (is_ios) {
-      var push_key = data.push_key;
-      user.push_key = push_key;
+      var push_key = data.push_key
+      user.push_key = push_key
     }
     user.save(function(err) {
-      next(err,user);
-
-    });
-   });
+      next(err,user)
+    })
+   })
 }
 
 var findUserWithToken = function(token, next) {
   User.findOne({token:token}, function(err, user) {
-    next(err, user);
-  });
+    next(err, user)
+  })
 }
 
 var sendPush = function (message, to_id) {
-
   User.findOne({userID:message.from_id}, function(err, sender){
     User.findOne({userID:to_id}, function(err, receiver){
       if(sender && receiver && receiver.push_key) {
         if(receiver.is_ios) {
-          sendPushIOS(sender, receiver, message);
+          sendPushIOS(sender, receiver, message)
         } else {
-          sendPushAndroid(sender, receiver, message);
+          sendPushAndroid(sender, receiver, message)
         }
       }
-    });
-  });
+    })
+  })
 }
 
 var sendPushIOS = function (sender, receiver, message) {
-  var myDevice = new apn.Device(receiver.push_key);
-  var note = new apn.Notification();
-  note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
-  note.sound = "ping.aiff";
-  note.alert = sender.first_name + " " + sender.last_name + ": " + message.content;
-  note.payload = {'messageFrom': sender.userID};
-  apnConnection.pushNotification(note, myDevice); 
+  var myDevice = new apn.Device(receiver.push_key)
+  var note = new apn.Notification()
+  note.expiry = Math.floor(Date.now() / 1000) + 3600*6 // Expires 6 hour from now.
+  note.sound = 'ping.aiff'
+  note.alert = sender.first_name + ' ' + sender.last_name + ': ' + message.content
+  note.payload = {'messageFrom': sender.userID}
+  apnConnection.pushNotification(note, myDevice) 
 }
 
 var sendPushAndroid = function (sender, receiver, message) {
-
-var message = new gcm.Message();
+var message = new gcm.Message()
 message.addNotification({
-  title: sender.first_name + " " + sender.last_name,
-  body: message.content,
-  icon: 'ic_launcher'
-});
+    title: sender.first_name + ' ' + sender.last_name
+  , body: message.content
+  , icon: 'ic_launcher'
+})
 
-message.addData('messageFrom', sender.userID);
-var regTokens = ['YOUR_REG_TOKEN_HERE'];
+message.addData('messageFrom', sender.userID)
+var regTokens = ['YOUR_REG_TOKEN_HERE']
 
-var sender = new gcm.Sender('YOUR_API_KEY_HERE');
+var sender = new gcm.Sender('YOUR_API_KEY_HERE')
 
-sender.send(message, { registrationTokens: regTokens }, function (err, response) {
-    if(err) console.error(err);
-    else    console.log(response);
-});
-
+sender.send(  message
+            , { registrationTokens: regTokens }
+            , function (err, response) {
+    if (err) console.error(err)
+    else    console.log(response)
+})
 }
 
-var read_all_messages = function(from_id, to_id, next) {//REDO
+var readAllMessages = function(from_id, to_id, next) {//REDO
 
-  console.log(from_id + "  " + to_id); 
+  console.log(from_id + ' ' + to_id)
 
-  Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}, function(err,conversation){
+  Conversation
+  .findOne(  {$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]}
+           , function(err,conversation){
 
-    console.log (conversation);
+    console.log (conversation)
 
     conversation.messages.forEach(function(item){
 
       if(!item.is_read && item.from_id == to_id) {
-        item.is_read = true;          
+        item.is_read = true   
       }
-    });
+    })
 
     conversation.save(function(err) {
-        next(err,conversation);
-    });
-  });
+        next(err,conversation)
+    })
+  })
 }
 
 /*||||||||||||||||||||||||||||||||||||||END FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
@@ -355,20 +333,20 @@ var read_all_messages = function(from_id, to_id, next) {//REDO
 io.on('connection', function(socket) {
 
   socket.emit('setup', {
-    status:"connected"
-  });
+    status:'connected'
+  })
 
   socket.on('new_user', function (data){
-    var token  = data.token;
+    var token  = data.token
 
     findUserWithToken (token, function(err, user){
       if(user) {
-        console.log(user.userID);
-        socket.join(user.userID);
+        console.log(user.userID)
+        socket.join(user.userID)
     }
-    });
-  });
+    })
+  })
 
-});
+})
 /*||||||||||||||||||||||||||||||||||||||END SOCKETS||||||||||||||||||||||||||||||||||||||*/
 
