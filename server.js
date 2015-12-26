@@ -1,16 +1,29 @@
+//server
 var express = require('express');
 var favicon = require('serve-favicon');
 var mongoose = require('mongoose');
 var morgan = require('morgan');
 var bodyParser = require('body-parser');
 var methodOverride = require('method-override');
-var apn = require('apn');
+
+//tokens
 var crypto = require('crypto');
 var base64url = require('base64url');
 
+//push
+var apn = require('apn');
+var gcm = require('node-gcm');
+
+var options = {production:false};
+var apnConnection = new apn.Connection(options);
+
+//db
+var User = require("./models/models").User;
+var Message = require("./models/models").Message;
+var Conversation = require("./models/models").Conversations;
+
 var app = express();
 app.set('port', (process.env.PORT || 5000));
-//var server = require('http').Server(app);
 
 var server = app.listen(app.get('port'), function () {
     console.log('Express server listening on port ' + app.get('port'));
@@ -30,7 +43,7 @@ var messager_api_key = 'this_is_my_awesome_api_key';
 var uristring = 'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d';
 
 mongoose.connect(uristring, function(err,res) {
-	 if (err) {
+   if (err) {
         console.log ('ERROR connecting to: ' + uristring + '. ' + err);
      //   trow err;
     } else {
@@ -42,38 +55,6 @@ var options = {production:false};
 
 var apnConnection = new apn.Connection(options);
 
-//Create a schema for chat
-
-var MessageSchema = mongoose.Schema({
-  created: Date,
-  content: String,
-  room: String,
-  from_id:Number,
-  is_read:Boolean
-});
-
-
-var UserSchema = mongoose.Schema({
-	_id: Number,
-	userID:Number,
-	first_name:String,
-	last_name:String,
-	is_ios:Boolean,
-	push_key:String,
-	thumb_url:String,
-	token:String
-});
-
-var ConversationSchema = mongoose.Schema({
-	users:[Number],
-	messages:[MessageSchema],
-	users_refs: [{ type: Number, ref: 'User' }]
-});
-
-
-var User = mongoose.model('User',UserSchema);
-var Message = mongoose.model('Message', MessageSchema);
-var Conversation = mongoose.model('Conversation',ConversationSchema);
 
 //Allow CORS
 app.all('/*', function(req, res, next) {
@@ -89,141 +70,129 @@ app.all('/*', function(req, res, next) {
 
 /*||||||||||||||||||||||||||||||||||||||ROUTES||||||||||||||||||||||||||||||||||||||*/
 //Route for our index file
-app.get('/', function(req, res) {
- res.json({"main":"true"});
-});
-
 
 app.post('/registration',function(req, res) {
 
-	var messgeaApiKey = req.body.user_api_key;
+  var messgeaApiKey = req.body.user_api_key;
 
-	if(messgeaApiKey !== messager_api_key) {
-		res.status(422).json({"error":"apiKey_error"})
-	} else {
-		var usr = req.body.user;
-		saveUser(usr, function(err,user){
+  if(messgeaApiKey !== messager_api_key) {
+    res.status(422).json({"error":"apiKey_error"})
+  } else {
+    var usr = req.body.user;
+    saveUser(usr, function(err,user){ 
+      console.log(user);
+      if(err) {
+        res.json(err);
+      } else {
+        res.json(user);
+      }
 
-			console.log(user);
-
-			if(err) {
-				res.json(err);
-			} else {
-				res.json(user);
-			}
-
-		});
-	}
+    });
+  }
 });
-
 
 
 app.get('/conversations', function(req,res) {
 
-	findUserWithToken(req.query.token, function(err,user) {
+  findUserWithToken(req.query.token, function(err,user) {
 
-		if(user) {
-			var user_id =user.userID;
+    if(user) {
+      var user_id =user.userID;
 
-	Conversation
-	.find({users: { "$in" : [user_id]}})
-	.select({"messages": { "$slice": -10 }})
-	.populate("users_refs")
-	.sort("-messages.created")
-	.exec(function(err, conversations) { 
-		// conversations.forEach(function(item){
-		// 	item.users.forEach(function(it){
-		// 		console.log("conversation types " + typeof(it));
-		// 	});
-		// });
-		if(err){
-			res.status(500).json(err);
-		} else {
-			res.json(conversations);
-		}
-	});
-	 } else {
-			res.status(500).json(err);
-	}
+  Conversation
+  .find({users: { "$in" : [user_id]}})
+  .select({"messages": { "$slice": -10 }})
+  .populate("users_refs")
+  .sort("-messages.created")
+  .exec(function(err, conversations) { 
+    if(err){
+      res.status(500).json(err);
+    } else {
+      res.json(conversations);
+    }
+  });
+   } else {
+      res.status(500).json(err);
+  }
 }); 
 });
 
 
 app.get('/conversation_between', function(req,res){
 
-	console.log("token " + req.query.token);
+  console.log("token " + req.query.token);
 
-	findUserWithToken(req.query.token, function(err,user) {
-	console.log("token " + req.query.token + user);
-	if(user) {
-		var from_id = user.userID;
-		var to_id =req.query.to_id;
+  findUserWithToken(req.query.token, function(err,user) {
+  console.log("token " + req.query.token + user);
+  if(user) {
+    var from_id = user.userID;
+    var to_id =req.query.to_id;
 
-	console.log(from_id + "  " + to_id + " type from_id" + typeof(from_id) + "type to_id" + typeof(to_id));
+  console.log(from_id + "  " + to_id + " type from_id" + typeof(from_id) + "type to_id" + typeof(to_id));
 
-	findConvFor(from_id, to_id, function(error, conversation){
+  findConvFor(from_id, to_id, function(error, conversation){
 
-		console.log("conversation beetween" + conversation);
-		if(error) {
-			res.status(500).json(error);
-		} else {
-			res.json(conversation);
-		}
-	});
+    console.log("conversation beetween" + conversation);
+    if(error) {
+      res.status(500).json(error);
+    } else {
+      res.json(conversation);
+    }
+  });
 } else {
-	console.log(err);
-	res.status(500).json(err);
+  console.log(err);
+  res.status(500).json(err);
 }
 });
 });
 
 
 app.post('/messages',function(req,res){
-	findUserWithToken(req.body.token, function(err,user) {
+  findUserWithToken(req.body.token, function(err,user) {
 
-	if(user) {
+  if(user) {
 
-		var messe_text = req.body.message
+    var messe_text = req.body.message
 
-	
-	var to_id = req.body.to_id;
-	var from_id = parseInt(user.userID);
+  
+  var to_id = req.body.to_id;
+  var from_id = parseInt(user.userID);
     var message = {from_id:from_id,message:messe_text};
-	messageWork(message, from_id,to_id, function(err,conv,msg) {
-		if (err) {
-			res.status(500).json(err);
-		} else {
-			sendPush(msg, to_id);
-			io.in(to_id).emit('message_created', msg);
-			res.json(msg);
-		}
-	}); 
-	} else {
-		res.status(500).json(err);
-	}});
+  messageWork(message, from_id,to_id, function(err,conv,msg) {
+    if (err) {
+      res.status(500).json(err);
+    } else {
+      sendPush(msg, to_id);
+      io.in(to_id).emit('message_created', msg);
+      res.json(msg);
+    }
+  }); 
+  } else {
+    res.status(500).json(err);
+  }});
 });
 
 app.post('/read_messages', function(req, res){
 findUserWithToken(req.body.token, function(err,user) {
-	if(user) {
-	var to_id = parseInt(req.body.to_id);
-	var from_id = user.userID;
+  if(user) {
+  var to_id = parseInt(req.body.to_id);
+  var from_id = user.userID;
 
-	console.log(user);
+  console.log(user);
 
-	read_all_messages(from_id,to_id,function(err,conversations) {
+  read_all_messages(from_id,to_id,function(err,conversations) {
 
-		if(!err) {
-		res.json(conversations);
-	} else {
-		res.status(500).json(err);
-	}
+    if(!err) {
+    res.json(conversations);
+  } else {
+    res.status(500).json(err);
+  }
 
-	}); 
+  }); 
 } else {
-	res.status(500).json(err);
+  res.status(500).json(err);
 }
-	});
+  });
 
 });
 
@@ -233,49 +202,45 @@ findUserWithToken(req.body.token, function(err,user) {
 
 var messageWork = function(message,to_id,from_id,next) {
 
-		findConvFor(from_id, to_id, function(err, conv){
-			if(conv){
-				conv.users_refs = [to_id,from_id];
-				saveMessage(message,function(err,msg){
+    findConvFor(from_id, to_id, function(err, conv){
+      if(conv){
+        conv.users_refs = [to_id,from_id];
+        saveMessage(message,function(err,msg){
 
-					conv.messages.push(msg);
-					conv.save(function(err,convers){
-						next(err,convers,msg);
-					});
-				});
-			} else {
-				saveMessage(message, function(err, msg){
-					conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg]});
-					conv.save(function(error,convers){
-						// if(!error){
-						// 	saveConversation(convers, to_id);
-						// 	saveConversation(convers, from_id);
-						// }
-						next(err, convers, msg);
-					});
-				});
-			}
-		});
+          conv.messages.push(msg);
+          conv.save(function(err,convers){
+            next(err,convers,msg);
+          });
+        });
+      } else {
+        saveMessage(message, function(err, msg){
+          conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg]});
+          conv.save(function(error,convers){
+            next(err, convers, msg);
+          });
+        });
+      }
+    });
 }
 
 var findConvFor = function(from_id, to_id,next){
-	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]})
-	.populate("users_refs").exec(function(err, conv){
-		next(err,conv);
-	});
+  Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]})
+  .populate("users_refs").exec(function(err, conv){
+    next(err,conv);
+  });
 }
 
 var saveMessage = function (data, next) {
-	//console.log(data);
-	var newMsg = new Message({
-      				content: data.message,
-     				 created: new Date(),
-     				 from_id: data.from_id,
-     				 is_read:false
-     	      });
-	newMsg.save(function(err,msg){
-		next(err,msg);
-	});
+  //console.log(data);
+  var newMsg = new Message({
+              content: data.message,
+             created: new Date(),
+             from_id: data.from_id,
+             is_read:false
+            });
+  newMsg.save(function(err,msg){
+    next(err,msg);
+  });
 }
 
 function randomStringAsBase64Url(size) {
@@ -283,77 +248,104 @@ function randomStringAsBase64Url(size) {
 }
 
 var saveUser = function(data,next) {
-	var user_id = parseInt(data.user_id);
-	User.findOne({userID:user_id}, function(err, user){
-		if(!user) {
-			user = new User({userID:user_id,_id:user_id});
-		} 
-		var is_ios = data.is_ios;
-		var first_name = data.first_name;
-		var last_name = data.last_name;
-		var thumb_url = data.thumb_url;
-		var user_api_key = randomStringAsBase64Url(16);
-		user.is_ios = is_ios;
-		user.first_name = first_name;
-		user.last_name = last_name;
-		user.thumb_url = thumb_url;
-		user.token = user_api_key;
+  var user_id = parseInt(data.user_id);
+  User.findOne({userID:user_id}, function(err, user){
+    if(!user) {
+      user = new User({userID:user_id,_id:user_id});
+    } 
+    var is_ios = data.is_ios;
+    var first_name = data.first_name;
+    var last_name = data.last_name;
+    var thumb_url = data.thumb_url;
+    var user_api_key = randomStringAsBase64Url(16);
+    user.is_ios = is_ios;
+    user.first_name = first_name;
+    user.last_name = last_name;
+    user.thumb_url = thumb_url;
+    user.token = user_api_key;
 
-		if (is_ios) {
-			var push_key = data.push_key;
-			user.push_key = push_key;
-		}
-		user.save(function(err) {
-			next(err,user);
+    if (is_ios) {
+      var push_key = data.push_key;
+      user.push_key = push_key;
+    }
+    user.save(function(err) {
+      next(err,user);
 
-		});
-	 });
+    });
+   });
 }
 
 var findUserWithToken = function(token, next) {
-	User.findOne({token:token}, function(err, user) {
-		next(err, user);
-	});
+  User.findOne({token:token}, function(err, user) {
+    next(err, user);
+  });
 }
 
-var sendPush = function (message,to_id) {
+var sendPush = function (message, to_id) {
 
-	User.findOne({userID:message.from_id}, function(err, sender){
-		User.findOne({userID:to_id}, function(err, reciever){
-			if(sender && reciever) {
-				if(reciever.is_ios && reciever.push_key) {
-					var myDevice = new apn.Device(reciever.push_key);
-					var note = new apn.Notification();
-					note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
-					note.sound = "ping.aiff";
-					note.alert = sender.first_name + " " + sender.last_name +": "+message.content;
-					note.payload = {'messageFrom': sender.userID};
-					apnConnection.pushNotification(note, myDevice); 
-				}
-			}
-		});
-	});
+  User.findOne({userID:message.from_id}, function(err, sender){
+    User.findOne({userID:to_id}, function(err, receiver){
+      if(sender && receiver && receiver.push_key) {
+        if(receiver.is_ios) {
+          sendPushIOS(sender, receiver, message);
+        } else {
+          sendPushAndroid(sender, receiver, message);
+        }
+      }
+    });
+  });
+}
+
+var sendPushIOS = function (sender, receiver, message) {
+  var myDevice = new apn.Device(receiver.push_key);
+  var note = new apn.Notification();
+  note.expiry = Math.floor(Date.now() / 1000) + 3600*6; // Expires 6 hour from now.
+  note.sound = "ping.aiff";
+  note.alert = sender.first_name + " " + sender.last_name + ": " + message.content;
+  note.payload = {'messageFrom': sender.userID};
+  apnConnection.pushNotification(note, myDevice); 
+}
+
+var sendPushAndroid = function (sender, receiver, message) {
+
+var message = new gcm.Message();
+message.addNotification({
+  title: sender.first_name + " " + sender.last_name,
+  body: message.content,
+  icon: 'ic_launcher'
+});
+
+message.addData('messageFrom', sender.userID);
+var regTokens = ['YOUR_REG_TOKEN_HERE'];
+
+var sender = new gcm.Sender('YOUR_API_KEY_HERE');
+
+sender.send(message, { registrationTokens: regTokens }, function (err, response) {
+    if(err) console.error(err);
+    else    console.log(response);
+});
+
 }
 
 var read_all_messages = function(from_id, to_id, next) {//REDO
 
-	console.log(from_id + "  " + to_id); 
+  console.log(from_id + "  " + to_id); 
 
-	Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}, function(err,conversation){
+  Conversation.findOne({$or:[{"users":[to_id,from_id]},{"users":[from_id,to_id]}]}, function(err,conversation){
 
-		console.log (conversation);
+    console.log (conversation);
 
-		conversation.messages.forEach(function(item){
+    conversation.messages.forEach(function(item){
 
-			if(!item.is_read && item.from_id == to_id) {
-				item.is_read = true;					
-			}
-		});
+      if(!item.is_read && item.from_id == to_id) {
+        item.is_read = true;          
+      }
+    });
 
-		conversation.save(function(err) {
-				next(err,conversation);
-		});
-	});
+    conversation.save(function(err) {
+        next(err,conversation);
+    });
+  });
 }
 
 /*||||||||||||||||||||||||||||||||||||||END FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
@@ -367,14 +359,14 @@ io.on('connection', function(socket) {
   });
 
   socket.on('new_user', function (data){
-  	var token  = data.token;
+    var token  = data.token;
 
-  	findUserWithToken (token, function(err, user){
-  		if(user) {
-  			console.log(user.userID);
-  			socket.join(user.userID);
-  	}
-  	});
+    findUserWithToken (token, function(err, user){
+      if(user) {
+        console.log(user.userID);
+        socket.join(user.userID);
+    }
+    });
   });
 
 });

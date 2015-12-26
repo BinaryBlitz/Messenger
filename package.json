@@ -9,6 +9,7 @@
     "method-override": "^2.3.5",
     "mongoose": "latest",
     "morgan": "latest",
+    "node-gcm": "^0.13.0",
     "passport-localapikey": "0.0.3",
     "serve-favicon": "^2.3.0",
     "socket.io": "latest"
