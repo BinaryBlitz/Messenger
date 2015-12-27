@@ -10,20 +10,20 @@ var MessageSchema = mongoose.Schema({
 });
 
 var ConversationSchema = mongoose.Schema({
-  users:[Number],
-  messages:[MessageSchema],
+  users: [Number],
+  messages: [MessageSchema],
   users_refs: [{ type: Number, ref: 'User' }]
 });
 
 var UserSchema = mongoose.Schema({
   _id: Number,
-  userID:Number,
-  first_name:String,
-  last_name:String,
-  is_ios:Boolean,
-  push_key:String,
-  thumb_url:String,
-  token:String
+  userID: Number,
+  first_name: String,
+  last_name: String,
+  is_ios: Boolean,
+  push_key: String,
+  thumb_url: String,
+  token: String
 });
 
 var User = mongoose.model('User',UserSchema);

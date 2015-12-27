@@ -1,0 +1,11 @@
+{
+	"server":{
+		"api_key":"this_is_my_awesome_api_key"
+	}, 
+	"dbConfig":{
+		"host":"mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d"
+	},
+	"push":{
+		"options":{"production":false}
+	}
+}
