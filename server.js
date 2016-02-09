@@ -26,8 +26,9 @@ var apnConnection = new apn.Connection(options);
 //db
 var User = require('./models/models').User;
 var Message = require('./models/models').Message;
-var Conversation = require('./models/models').Conversations;
+var Conversation = require('./models/models').Conversation;
 
+console.log(Conversation)
 
 //server
 var app = express();
