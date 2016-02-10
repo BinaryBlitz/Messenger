@@ -101,8 +101,10 @@ app.post('/registration',function(req, res) {
 });
 
 app.get('/conversations', function(req,res) {
+  console.log ("query " + req.query);
   findUserWithToken(req.query.token, function(err,user) {
     if(user) {
+      console.log("user " + user);
       var user_id = user.userID;
       Conversation
       .find({users: { '$in' : [user_id]}})
@@ -110,13 +112,16 @@ app.get('/conversations', function(req,res) {
       .populate('users_refs')
       .sort('-messages.created')
       .exec(function(err, conversations) { 
+        console.log("convs "+conversations)
       if(err){
+        console.log("errror "+err)
         res.status(500).json(err);
       } else {
         res.json(conversations);
       }
   });
    } else {
+    console.log("not user")
       res.status(500).json(err);
   }
   });
