@@ -28,8 +28,6 @@ var User = require('./models/models').User;
 var Message = require('./models/models').Message;
 var Conversation = require('./models/models').Conversation;
 
-console.log(Conversation)
-
 //server
 var app = express();
 app.set('port', (process.env.PORT || 5000));
@@ -189,6 +187,30 @@ findUserWithToken(req.body.token, function(err,user) {
   }
 });
 });
+
+
+app.delete('/user_log_out', function(req, res) {
+  console.log(req.body.token);
+findUserWithToken(req.query.token, function(err,user) {
+  if(user) {
+    user.push_key = null;
+    user.token = null;
+
+    user.save(function(err,user){
+      if(user) {
+           res.json({"status":"done"});
+           console.log (user);
+         } else {
+          res.status(500).json(err);
+         }
+          });
+
+  } else {
+    res.status(500).json(err);
+  }
+
+
+}); });
 
 /*||||||||||||||||||||||||||||||||||||||END ROUTES||||||||||||||||||||||||||||||||||||||*/
 
