@@ -262,7 +262,11 @@ var messageWork = function(message,to_id,from_id,next) {
       } else {
         saveMessage(message, function(err, msg){
           conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg._id]});
+          
           conv.save(function(error,convers){
+            msg.conversation_id = convers._id;
+            msg.save(function(err,msg){});
+
             next(err, convers, msg);
           });
         });
@@ -280,40 +284,18 @@ var findConvFor = function(from_id, to_id,next) {
 
 
 var findMessages = function(from_id, to_id, count, offset, next) {
-  // Conversation
-  // .findOne({$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]})
-  // .select('messages')
-  // .limit(count)
-  // .skip(offset)
-  // .exec(function(err, messages){
-  //   next(err, messages);
-  // });
-
-
-  // Event.find()
-  //   .select('name')
-  //   .limit(perPage)
-  //   .skip(perPage * page)
-  //   .sort({
-  //       name: 'asc'
-  //   })
-  //   .exec(function(err, events) {
-  //       Event.count().exec(function(err, count) {
-  //           res.render('events', {
-  //               events: events,
-  //               page: page,
-  //               pages: count / perPage
-  //           })
-  //       })
-  //   })
 
   findConvFor(from_id, to_id, function(error, conversation){
+    if(conversation) {
     Message
     .find({ conversation_id: conversation._id })
     .limit(count)
     .skip(offset)
-    .sort('-created')
+    .sort('created')
     .exec(next);
+  } else {
+    next(error,null);
+  }
   });
 
 };
@@ -353,10 +335,10 @@ var saveUser = function(data,next) {
     user.thumb_url = thumb_url;
     user.token = user_api_key;
 
-    if (is_ios) {
+    // if (is_ios) {
       var push_key = data.push_key;
       user.push_key = push_key;
-    }
+    // }
     user.save(function(err) {
       next(err,user);
     });
@@ -372,6 +354,8 @@ var findUserWithToken = function(token, next) {
 var sendPush = function (message, to_id) {
   User.findOne({userID:message.from_id}, function(err, sender){
     User.findOne({userID:to_id}, function(err, receiver){
+      console.log(receiver);
+      receiver.push_key = "fwb0L2jCzG4:APA91bFwfqT5cdqnqCiIxI___6wTRHTuNtrYLi7eBxqnGFlU4yjHx96Y9XKKNtYZ4fsepGUmTOKAbzMD5l5aUcsxZR4VNVE3i_VRh3FqsCoyUIwVor8oqJQzYhNyZGBBgMaBbmQ0YplE"
       if(sender && receiver && receiver.push_key) {
         if(receiver.is_ios) {
           sendPushIOS(sender, receiver, message);
@@ -395,16 +379,22 @@ var sendPushIOS = function (sender, receiver, message) {
 
 var sendPushAndroid = function (sender, receiver, message) {
 var gcmessage = new gcm.Message();
-message.addNotification({
+gcmessage.addNotification({
     title: sender.first_name + ' ' + sender.last_name,
     body: message.content, 
     icon: 'ic_launcher'
 });
 
 gcmessage.addData('messageFrom', sender.userID);
-var regTokens = ['YOUR_REG_TOKEN_HERE'];
+var receiver_token = receiver.push_key;
+var regTokens = [receiver_token];
 
-var gcmsender = new gcm.Sender('YOUR_API_KEY_HERE');
+var android_api_key = config.get('push.android_api_key');
+var gcmsender = new gcm.Sender(android_api_key);
+
+console.log(android_api_key);
+console.log(receiver_token);
+console.log("-------------------------------------------")
 
 gcmsender.send(  gcmessage,
          { registrationTokens: regTokens }, 
@@ -422,9 +412,9 @@ var readAllMessages = function(from_id, to_id, next) {//REDO
   .findOne(  {$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]},
    function(err,conversation){
 
-    console.log (conversation)
+    console.log (conversation);
 
-    ;conversation.messages.forEach(function(item){
+    conversation.messages.forEach(function(item){
 
       if(!item.is_read && item.from_id == to_id) {
         item.is_read = true;   

@@ -6,6 +6,7 @@
 		"host":"mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d"
 	},
 	"push":{
-		"options":{"production":false}
+		"options":{"production":false},
+		"android_api_key":"AIzaSyAQJY4BD8jT7f7WvwpsyAyxCkI4E6Uoby4"
 	}
 }
