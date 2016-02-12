@@ -106,8 +106,9 @@ app.get('/conversations', function(req,res) {
       var user_id = user.userID;
       Conversation
       .find({users: { '$in' : [user_id]}})
-      .select({'messages': { '$slice': -10 }})
       .populate('users_refs')
+      .select({'messages': { '$slice': -10 }})
+      .populate('messages')
       .sort('-messages.created')
       .exec(function(err, conversations) { 
         console.log("convs "+conversations)
@@ -130,7 +131,12 @@ app.get('/conversation_between', function(req,res){
   findUserWithToken(req.query.token, function(err,user) {
   if(user) {
     var from_id = user.userID;
-    var to_id =req.query.to_id;
+    var to_id = req.query.to_id;
+
+    var count = req.query.count;
+    var offset = req.query.offset;
+
+
     findConvFor(from_id, to_id, function(error, conversation){
     if(error) {
       res.status(500).json(error);
@@ -143,6 +149,30 @@ app.get('/conversation_between', function(req,res){
   res.status(500).json(err);
 }
 });
+});
+
+app.get('/messages', function(req, res){
+  findUserWithToken(req.query.token, function(err,user) {
+    if(user) {
+      var from_id = user.userID;
+      var to_id = req.query.to_id;
+
+      var count = req.query.count;
+      var offset = req.query.offset;
+// from_id, to_id, count, offset, next
+      findMessages(from_id, to_id, count, offset, function(err, messages){
+        if(err) {
+          res.status(500).json(error);
+        } else {
+
+          console.log(messages);
+          res.json(messages);
+        }
+      });
+    } else {
+      res.status(500).json(err);
+    }
+  });
 });
 
 
@@ -221,16 +251,17 @@ var messageWork = function(message,to_id,from_id,next) {
     findConvFor(from_id, to_id, function(err, conv){
       if(conv){
         conv.users_refs = [to_id,from_id];
+        message.conversation_id = conv._id;
         saveMessage(message,function(err,msg){
 
-          conv.messages.push(msg);
+          conv.messages.push(msg._id);
           conv.save(function(err,convers){
             next(err,convers,msg);
           });
         });
       } else {
         saveMessage(message, function(err, msg){
-          conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg]});
+          conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg._id]});
           conv.save(function(error,convers){
             next(err, convers, msg);
           });
@@ -239,20 +270,62 @@ var messageWork = function(message,to_id,from_id,next) {
     });
 };
 
-var findConvFor = function(from_id, to_id,next){
+var findConvFor = function(from_id, to_id,next) {
   Conversation
   .findOne({$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]})
-  .populate('users_refs').exec(function(err, conv){
+  .populate('users_refs messages').exec(function(err, conv){
     next(err,conv);
   });
 };
 
+
+var findMessages = function(from_id, to_id, count, offset, next) {
+  // Conversation
+  // .findOne({$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]})
+  // .select('messages')
+  // .limit(count)
+  // .skip(offset)
+  // .exec(function(err, messages){
+  //   next(err, messages);
+  // });
+
+
+  // Event.find()
+  //   .select('name')
+  //   .limit(perPage)
+  //   .skip(perPage * page)
+  //   .sort({
+  //       name: 'asc'
+  //   })
+  //   .exec(function(err, events) {
+  //       Event.count().exec(function(err, count) {
+  //           res.render('events', {
+  //               events: events,
+  //               page: page,
+  //               pages: count / perPage
+  //           })
+  //       })
+  //   })
+
+  findConvFor(from_id, to_id, function(error, conversation){
+    Message
+    .find({ conversation_id: conversation._id })
+    .limit(count)
+    .skip(offset)
+    .sort('-created')
+    .exec(next);
+  });
+
+};
+
 var saveMessage = function (data, next) {
+  console.log(data);
   var newMsg = new Message({
                 content: data.message,
                 created: new Date(),
                 from_id: data.from_id,
-                is_read:false
+                is_read:false,
+                conversation_id:data.conversation_id
             });
   newMsg.save(function(err,msg){
     next(err,msg);

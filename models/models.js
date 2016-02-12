@@ -6,12 +6,13 @@ var MessageSchema = mongoose.Schema({
   content: String,
   room: String,
   from_id: Number,
-  is_read: Boolean
+  is_read: Boolean,
+  conversation_id:String
 });
 
 var ConversationSchema = mongoose.Schema({
   users: [Number],
-  messages: [MessageSchema],
+  messages: [{ type: String, ref: 'Message' }],
   users_refs: [{ type: Number, ref: 'User' }]
 });
 
