@@ -13,7 +13,8 @@ var MessageSchema = mongoose.Schema({
 var ConversationSchema = mongoose.Schema({
   users: [Number],
   messages: [{ type: String, ref: 'Message' }],
-  users_refs: [{ type: Number, ref: 'User' }]
+  users_refs: [{ type: Number, ref: 'User' }],
+  last_date:Date
 });
 
 var UserSchema = mongoose.Schema({

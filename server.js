@@ -48,7 +48,7 @@ app.use(bodyParser.json());
 app.use(methodOverride());
 
 //Connect to mongo DB database
-var uristring = config.get('dbConfig.host'); 
+var uristring = config.get('dbConfig.host');
 //'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d'
 
 mongoose.connect(uristring, function(err,res) {
@@ -87,7 +87,7 @@ app.post('/registration',function(req, res) {
     res.status(422).json({'error':'apiKey_error'});
   } else {
     var usr = req.body.user;
-    saveUser(usr, function(err,user){ 
+    saveUser(usr, function(err,user){
       console.log(user);
       if(err) {
         res.json(err);
@@ -109,8 +109,8 @@ app.get('/conversations', function(req,res) {
       .populate('users_refs')
       .select({'messages': { '$slice': -10 }})
       .populate('messages')
-      .sort('-messages.created')
-      .exec(function(err, conversations) { 
+      .sort('-last_date')
+      .exec(function(err, conversations) {
         console.log("convs "+conversations)
       if(err){
         console.log("errror "+err)
@@ -132,9 +132,6 @@ app.get('/conversation_between', function(req,res){
   if(user) {
     var from_id = user.userID;
     var to_id = req.query.to_id;
-
-    var count = req.query.count;
-    var offset = req.query.offset;
 
 
     findConvFor(from_id, to_id, function(error, conversation){
@@ -207,7 +204,7 @@ findUserWithToken(req.body.token, function(err,user) {
     console.log(user);
     readAllMessages(from_id,to_id,function(err,conversations) {
     if(!err) {
-      res.json(conversations);
+      res.json({"status":"done"});
     } else {
       res.status(500).json(err);
     }
@@ -255,14 +252,20 @@ var messageWork = function(message,to_id,from_id,next) {
         saveMessage(message,function(err,msg){
 
           conv.messages.push(msg._id);
+          conv.last_date = msg.created;
           conv.save(function(err,convers){
             next(err,convers,msg);
           });
         });
       } else {
         saveMessage(message, function(err, msg){
-          conv = new Conversation ({users : [to_id,from_id], users_refs:[to_id,from_id], messages :[msg._id]});
-          
+          conv = new Conversation ({
+              users : [to_id,from_id]
+            , last_date:msg.created
+            , users_refs:[to_id,from_id]
+            , messages :[msg._id]
+          });
+          // conv.last_date = msg.created;
           conv.save(function(error,convers){
             msg.conversation_id = convers._id;
             msg.save(function(err,msg){});
@@ -277,7 +280,9 @@ var messageWork = function(message,to_id,from_id,next) {
 var findConvFor = function(from_id, to_id,next) {
   Conversation
   .findOne({$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]})
-  .populate('users_refs messages').exec(function(err, conv){
+  .select({'messages': { '$slice': -20 }})
+  .populate('users_refs messages')
+  .exec(function(err, conv){
     next(err,conv);
   });
 };
@@ -323,7 +328,7 @@ var saveUser = function(data,next) {
   User.findOne({userID:user_id}, function(err, user){
     if(!user) {
       user = new User({userID:user_id,_id:user_id});
-    } 
+    }
     var is_ios = data.is_ios;
     var first_name = data.first_name;
     var last_name = data.last_name;
@@ -355,7 +360,6 @@ var sendPush = function (message, to_id) {
   User.findOne({userID:message.from_id}, function(err, sender){
     User.findOne({userID:to_id}, function(err, receiver){
       console.log(receiver);
-      receiver.push_key = "fwb0L2jCzG4:APA91bFwfqT5cdqnqCiIxI___6wTRHTuNtrYLi7eBxqnGFlU4yjHx96Y9XKKNtYZ4fsepGUmTOKAbzMD5l5aUcsxZR4VNVE3i_VRh3FqsCoyUIwVor8oqJQzYhNyZGBBgMaBbmQ0YplE"
       if(sender && receiver && receiver.push_key) {
         if(receiver.is_ios) {
           sendPushIOS(sender, receiver, message);
@@ -370,18 +374,18 @@ var sendPush = function (message, to_id) {
 var sendPushIOS = function (sender, receiver, message) {
   var myDevice = new apn.Device(receiver.push_key);
   var note = new apn.Notification();
-  note.expiry = Math.floor(Date.now() / 1000) + 3600*6; 
+  note.expiry = Math.floor(Date.now() / 1000) + 3600*6;
   note.sound = 'ping.aiff';
   note.alert = sender.first_name + ' ' + sender.last_name + ': ' + message.content;
   note.payload = {'messageFrom': sender.userID};
-  apnConnection.pushNotification(note, myDevice); 
+  apnConnection.pushNotification(note, myDevice);
 };
 
 var sendPushAndroid = function (sender, receiver, message) {
 var gcmessage = new gcm.Message();
 gcmessage.addNotification({
     title: sender.first_name + ' ' + sender.last_name,
-    body: message.content, 
+    body: message.content,
     icon: 'ic_launcher'
 });
 
@@ -392,39 +396,60 @@ var regTokens = [receiver_token];
 var android_api_key = config.get('push.android_api_key');
 var gcmsender = new gcm.Sender(android_api_key);
 
-console.log(android_api_key);
-console.log(receiver_token);
-console.log("-------------------------------------------")
+// console.log(android_api_key);
+// console.log(receiver_token);
+// console.log("-------------------------------------------")
 
 gcmsender.send(  gcmessage,
-         { registrationTokens: regTokens }, 
+         { registrationTokens: regTokens },
          function (err, response) {
     if (err) console.error(err);
     else    console.log(response);
 });
 };
 
-var readAllMessages = function(from_id, to_id, next) {//REDO
-
+var readAllMessages = function(from_id, to_id, next) {
   console.log(from_id + ' ' + to_id);
 
-  Conversation
-  .findOne(  {$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]},
-   function(err,conversation){
-
-    console.log (conversation);
-
-    conversation.messages.forEach(function(item){
-
-      if(!item.is_read && item.from_id == to_id) {
-        item.is_read = true;   
+  findConvFor (from_id, to_id, function(err, conversation){
+    if(conversation) {
+    Message
+    .find({ conversation_id: conversation._id,is_read:false,from_id:to_id })
+    .sort('created')
+    .exec(function(err, messages){
+      if(!err){
+        messages.forEach(function(item){
+          if(!item.is_read && item.from_id == to_id) {
+            item.is_read = true;
+            item.save();
+          }
+        });
       }
+      next(err, conversation)
     });
+  } else {
+    next(error,null);
+  }
 
-    conversation.save(function(err) {
-        next(err,conversation);
-    });
   });
+
+  // Conversation
+  // .findOne(  {$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]},
+  //  function(err,conversation){
+  //
+  //   console.log (conversation);
+  //
+  //   conversation.messages.forEach(function(item){
+  //
+  //     if(!item.is_read && item.from_id == to_id) {
+  //       item.is_read = true;
+  //     }
+  //   });
+  //
+  //   conversation.save(function(err) {
+  //       next(err,conversation);
+  //   });
+  // });
 };
 
 /*||||||||||||||||||||||||||||||||||||||END FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
@@ -449,4 +474,3 @@ io.on('connection', function(socket) {
 
 });
 /*||||||||||||||||||||||||||||||||||||||END SOCKETS||||||||||||||||||||||||||||||||||||||*/
-
