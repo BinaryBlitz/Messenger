@@ -49,7 +49,6 @@ app.use(methodOverride());
 
 //Connect to mongo DB database
 var uristring = config.get('dbConfig.host');
-//'mongodb://heroku_gchjr54d:kghikrooqpah31jt5f9bvhr7n2@ds041484.mongolab.com:41484/heroku_gchjr54d'
 
 mongoose.connect(uristring, function(err,res) {
    if (err) {
@@ -155,9 +154,10 @@ app.get('/messages', function(req, res){
       var to_id = req.query.to_id;
 
       var count = req.query.count;
-      var offset = req.query.offset;
+      var last_date = req.query.last_date;
+      last_date = new Date(last_date);
 // from_id, to_id, count, offset, next
-      findMessages(from_id, to_id, count, offset, function(err, messages){
+      findMessages(from_id, to_id, count, last_date, function(err, messages){
         if(err) {
           res.status(500).json(error);
         } else {
@@ -288,21 +288,19 @@ var findConvFor = function(from_id, to_id,next) {
 };
 
 
-var findMessages = function(from_id, to_id, count, offset, next) {
+var findMessages = function(from_id, to_id, count, last_date, next) {
 
   findConvFor(from_id, to_id, function(error, conversation){
     if(conversation) {
     Message
-    .find({ conversation_id: conversation._id })
+    .find({ conversation_id: conversation._id, created: {$lte: last_date} })
     .limit(count)
-    .skip(offset)
     .sort('created')
     .exec(next);
   } else {
     next(error,null);
   }
   });
-
 };
 
 var saveMessage = function (data, next) {
@@ -433,23 +431,6 @@ var readAllMessages = function(from_id, to_id, next) {
 
   });
 
-  // Conversation
-  // .findOne(  {$or:[{'users':[to_id,from_id]},{'users':[from_id,to_id]}]},
-  //  function(err,conversation){
-  //
-  //   console.log (conversation);
-  //
-  //   conversation.messages.forEach(function(item){
-  //
-  //     if(!item.is_read && item.from_id == to_id) {
-  //       item.is_read = true;
-  //     }
-  //   });
-  //
-  //   conversation.save(function(err) {
-  //       next(err,conversation);
-  //   });
-  // });
 };
 
 /*||||||||||||||||||||||||||||||||||||||END FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
