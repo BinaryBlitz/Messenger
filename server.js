@@ -293,12 +293,19 @@ var findMessages = function(from_id, to_id, count, last_date, next) {
   findConvFor(from_id, to_id, function(error, conversation){
     if(conversation) {
     Message
-    .find({ conversation_id: conversation._id, created: {$lte: last_date} })
+    .find({ conversation_id: conversation._id, created: {$lt: last_date} })
+    .sort('-created')
     .limit(count)
-    .sort('created')
-    .exec(next);
+    .exec(function(err,messages) {
+      if(messages) {
+        messages = messages.reverse();
+      }
+      next(err, messages);
+
+    });
   } else {
-    next(error,null);
+    var arr = [];
+    next(error,arr);
   }
   });
 };
