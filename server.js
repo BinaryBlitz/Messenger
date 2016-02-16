@@ -117,7 +117,7 @@ app.get('/conversations', function(req, res) {
         .populate('users_refs')
         .select({
           'messages': {
-            '$slice': -10
+            '$slice': -20
           }
         })
         .populate('messages')
