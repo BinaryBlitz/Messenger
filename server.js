@@ -171,6 +171,8 @@ app.get('/messages', function(req, res) {
       // from_id, to_id, count, offset, next
       findMessages(from_id, to_id, count, last_date, function(err, messages) {
         if (err) {
+          console.log('no mesages');
+          console.log(err);
           res.status(500).json(error);
         } else {
           console.log(messages);
@@ -178,6 +180,8 @@ app.get('/messages', function(req, res) {
         }
       });
     } else {
+      console.log('user fail');
+      console.log(err);
       res.status(500).json(err);
     }
   });
@@ -222,10 +226,14 @@ app.post('/read_messages', function(req, res) {
             "status": "done"
           });
         } else {
+          console.log('conversation fail');
+          console.log(err);
           res.status(500).json(err);
         }
       });
     } else {
+      console.log('no user');
+      console.log(err);
       res.status(500).json(err);
     }
   });
@@ -259,7 +267,6 @@ app.delete('/user_log_out', function(req, res) {
 /*||||||||||||||||||||||||||||||||||||||FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
 
 var messageWork = function(message, to_id, from_id, next) {
-
   findConvFor(from_id, to_id, function(err, conv) {
     if (conv) {
       conv.users_refs = [to_id, from_id];
@@ -314,7 +321,6 @@ var findConvFor = function(from_id, to_id, next) {
 
 
 var findMessages = function(from_id, to_id, count, last_date, next) {
-
   findConvFor(from_id, to_id, function(error, conversation) {
     if (conversation) {
       Message
@@ -483,9 +489,7 @@ var readAllMessages = function(from_id, to_id, next) {
     } else {
       next(error, null);
     }
-
   });
-
 };
 
 /*||||||||||||||||||||||||||||||||||||||END FUNCTIONS||||||||||||||||||||||||||||||||||||||*/
