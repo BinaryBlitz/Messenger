@@ -438,15 +438,16 @@ var sendPushIOS = function(sender, receiver, message) {
 var sendPushAndroid = function(sender, receiver, message) {
   var gcmessage = new gcm.Message();
   gcmessage.addNotification({
-    title: sender.first_name + ' ' + sender.last_name,
-    body: message.content,
+    title: 'Mates',
+    body: sender.first_name + ' ' + sender.last_name+': '+message.content,
     icon: 'ic_launcher'
   });
   gcmessage.addData({
-    'action': 'MESSAGE'
+    'action': 'MESSAGE',
+    'messageFrom': sender.userID
   });
 
-  gcmessage.addData('messageFrom', sender.userID);
+  console.log(gcmessage);
   var receiver_token = receiver.push_key;
   var regTokens = [receiver_token];
 
