@@ -4,7 +4,6 @@ var mongoose = require('mongoose');
 var MessageSchema = mongoose.Schema({
   created: Date,
   content: String,
-  room: String,
   from_id: Number,
   is_read: Boolean,
   conversation_id:String
