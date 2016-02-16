@@ -133,8 +133,8 @@ app.get('/conversations', function(req, res) {
           }
         });
     } else {
-      console.log("not user")
-      res.status(500).json(err);
+      console.log("no user")
+      res.status(401).json(err);
     }
   });
 });
@@ -171,9 +171,9 @@ app.get('/messages', function(req, res) {
       // from_id, to_id, count, offset, next
       findMessages(from_id, to_id, count, last_date, function(err, messages) {
         if (err) {
-          console.log('no mesages');
+          console.log('messages find error');
           console.log(err);
-          res.status(500).json(error);
+          res.status(500).json(err);
         } else {
           console.log(messages);
           res.json(messages);
@@ -182,7 +182,7 @@ app.get('/messages', function(req, res) {
     } else {
       console.log('user fail');
       console.log(err);
-      res.status(500).json(err);
+      res.status(401).json(err);
     }
   });
 });
@@ -487,7 +487,7 @@ var readAllMessages = function(from_id, to_id, next) {
           next(err, conversation)
         });
     } else {
-      next(error, null);
+      next(err, null);
     }
   });
 };
