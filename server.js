@@ -38,7 +38,6 @@ var server = app.listen(app.get('port'), function() {
 
 var messager_api_key = config.get('server.api_key');
 
-
 var io = require('socket.io')(server);
 
 app.use(favicon(__dirname + '/favicon.ico'));
@@ -437,15 +436,18 @@ var sendPushIOS = function(sender, receiver, message) {
 
 var sendPushAndroid = function(sender, receiver, message) {
   var gcmessage = new gcm.Message();
+
+  gcmessage.addData('action', 'MESSAGE');
   gcmessage.addNotification({
     title: 'Mates',
     body: sender.first_name + ' ' + sender.last_name+': '+message.content,
     icon: 'ic_launcher'
   });
-  gcmessage.addData({
-    'action': 'MESSAGE',
-    'messageFrom': sender.userID
-  });
+
+  // gcmessage.addData({
+  //   'action': 'MESSAGE',
+  //   'messageFrom': sender.userID
+  // });
 
   console.log(gcmessage);
   var receiver_token = receiver.push_key;
