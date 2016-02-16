@@ -382,7 +382,7 @@ var sendPushIOS = function (sender, receiver, message) {
   note.expiry = Math.floor(Date.now() / 1000) + 3600*6;
   note.sound = 'ping.aiff';
   note.alert = sender.first_name + ' ' + sender.last_name + ': ' + message.content;
-  note.payload = {'messageFrom': sender.userID};
+  note.payload = {'messageFrom': sender.userID, 'action':'MESSAGE'};
   apnConnection.pushNotification(note, myDevice);
 };
 
@@ -393,6 +393,7 @@ gcmessage.addNotification({
     body: message.content,
     icon: 'ic_launcher'
 });
+  gcmessage.addData({'action':'MESSAGE'});
 
 gcmessage.addData('messageFrom', sender.userID);
 var receiver_token = receiver.push_key;
@@ -401,9 +402,6 @@ var regTokens = [receiver_token];
 var android_api_key = config.get('push.android_api_key');
 var gcmsender = new gcm.Sender(android_api_key);
 
-// console.log(android_api_key);
-// console.log(receiver_token);
-// console.log("-------------------------------------------")
 
 gcmsender.send(  gcmessage,
          { registrationTokens: regTokens },
