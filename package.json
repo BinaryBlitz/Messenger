@@ -14,5 +14,8 @@
     "passport-localapikey": "0.0.3",
     "serve-favicon": "^2.3.0",
     "socket.io": "latest"
+  },
+  "devDependencies": {
+    "flightplan": "^0.6.9"
   }
 }
