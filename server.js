@@ -114,7 +114,10 @@ app.get('/conversations', function(req, res) {
             '$in': [user_id]
           }
         })
-        .populate('users_refs')
+        .populate({
+          path:'users_refs',
+          select:'_id first_name last_name userID'
+        })
         .select({
           'messages': {
             '$slice': -20
@@ -312,7 +315,11 @@ var findConvFor = function(from_id, to_id, next) {
         '$slice': -20
       }
     })
-    .populate('users_refs messages')
+    .populate({
+      path:'users_refs',
+      select:'_id first_name last_name userID'
+    })
+    .populate('messages')
     .exec(function(err, conv) {
       next(err, conv);
     });
